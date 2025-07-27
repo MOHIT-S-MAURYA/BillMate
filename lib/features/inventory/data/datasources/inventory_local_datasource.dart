@@ -1,5 +1,6 @@
 import 'package:billmate/core/database/database_helper.dart';
 import 'package:billmate/features/inventory/data/models/item_model.dart';
+import 'package:billmate/core/events/inventory_events.dart';
 import 'package:injectable/injectable.dart';
 
 abstract class InventoryLocalDataSource {
@@ -11,6 +12,20 @@ abstract class InventoryLocalDataSource {
   Future<void> updateItem(ItemModel item);
   Future<void> deleteItem(int id);
   Future<void> updateStock(int itemId, int quantity);
+  Future<void> reduceStock(
+    int itemId,
+    int quantity, {
+    int? invoiceId,
+    String? notes,
+  });
+  Future<void> increaseStock(
+    int itemId,
+    int quantity, {
+    int? invoiceId,
+    String? notes,
+  });
+  Future<bool> checkStockAvailability(int itemId, int requiredQuantity);
+  Future<void> createInventoryTransaction(Map<String, dynamic> transaction);
   Future<List<ItemModel>> getLowStockItems();
   Future<List<ItemModel>> getOutOfStockItems();
   Future<List<CategoryModel>> getAllCategories();
@@ -127,6 +142,130 @@ class InventoryLocalDataSourceImpl implements InventoryLocalDataSource {
       where: 'id = ?',
       whereArgs: [itemId],
     );
+  }
+
+  @override
+  Future<void> reduceStock(
+    int itemId,
+    int quantity, {
+    int? invoiceId,
+    String? notes,
+  }) async {
+    final db = await databaseHelper.database;
+
+    // Get current stock
+    final currentItem = await getItemById(itemId);
+    if (currentItem == null) {
+      throw Exception('Item not found');
+    }
+
+    final newQuantity = currentItem.stockQuantity - quantity;
+    if (newQuantity < 0) {
+      throw Exception(
+        'Insufficient stock. Available: ${currentItem.stockQuantity}, Required: $quantity',
+      );
+    }
+
+    // Update stock quantity
+    await db.update(
+      'items',
+      {
+        'stock_quantity': newQuantity,
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [itemId],
+    );
+
+    // Create inventory transaction record
+    await createInventoryTransaction({
+      'item_id': itemId,
+      'transaction_type': 'SALE',
+      'quantity_change': -quantity,
+      'previous_quantity': currentItem.stockQuantity,
+      'new_quantity': newQuantity,
+      'invoice_id': invoiceId,
+      'created_at': DateTime.now().toIso8601String(),
+      'notes': notes ?? 'Stock reduced due to sale',
+    });
+
+    // Emit stock changed event
+    InventoryEventBus().emitStockChanged(
+      itemId,
+      data: {
+        'previousQuantity': currentItem.stockQuantity,
+        'newQuantity': newQuantity,
+        'change': -quantity,
+        'invoiceId': invoiceId,
+      },
+    );
+  }
+
+  @override
+  Future<void> increaseStock(
+    int itemId,
+    int quantity, {
+    int? invoiceId,
+    String? notes,
+  }) async {
+    final db = await databaseHelper.database;
+
+    // Get current stock
+    final currentItem = await getItemById(itemId);
+    if (currentItem == null) {
+      throw Exception('Item not found');
+    }
+
+    final newQuantity = currentItem.stockQuantity + quantity;
+
+    // Update stock quantity
+    await db.update(
+      'items',
+      {
+        'stock_quantity': newQuantity,
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [itemId],
+    );
+
+    // Create inventory transaction record
+    await createInventoryTransaction({
+      'item_id': itemId,
+      'transaction_type': 'RETURN',
+      'quantity_change': quantity,
+      'previous_quantity': currentItem.stockQuantity,
+      'new_quantity': newQuantity,
+      'invoice_id': invoiceId,
+      'created_at': DateTime.now().toIso8601String(),
+      'notes': notes ?? 'Stock increased due to restock/return',
+    });
+
+    // Emit stock changed event
+    InventoryEventBus().emitStockChanged(
+      itemId,
+      data: {
+        'previousQuantity': currentItem.stockQuantity,
+        'newQuantity': newQuantity,
+        'change': quantity,
+        'invoiceId': invoiceId,
+      },
+    );
+  }
+
+  @override
+  Future<bool> checkStockAvailability(int itemId, int requiredQuantity) async {
+    final item = await getItemById(itemId);
+    if (item == null) return false;
+    return item.stockQuantity >= requiredQuantity;
+  }
+
+  @override
+  Future<void> createInventoryTransaction(
+    Map<String, dynamic> transaction,
+  ) async {
+    final db = await databaseHelper.database;
+    await db.insert('inventory_transactions', transaction);
   }
 
   @override

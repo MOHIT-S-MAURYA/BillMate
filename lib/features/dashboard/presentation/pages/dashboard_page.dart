@@ -193,7 +193,7 @@ class DashboardView extends StatelessWidget {
 
         if (snapshot.hasError) {
           // Log error but don't show UI - fail silently for better UX
-          print('Error loading payment alerts: ${snapshot.error}');
+          // print('Error loading payment alerts: ${snapshot.error}');
           return const SizedBox.shrink();
         }
 

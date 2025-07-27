@@ -18,6 +18,13 @@ abstract class BillingLocalDataSource {
   Future<void> updateInvoice(InvoiceModel invoice);
   Future<void> deleteInvoice(int id);
   Future<void> updatePaymentStatus(int invoiceId, String status);
+  Future<void> updatePartialPayment(
+    int invoiceId,
+    String status,
+    double paidAmount,
+  );
+  Future<bool> validateInventoryQuantity(int itemId, int requestedQuantity);
+  Future<int> getAvailableStock(int itemId);
 
   // Customer operations
   Future<List<CustomerModel>> getAllCustomers();
@@ -295,6 +302,51 @@ class BillingLocalDataSourceImpl implements BillingLocalDataSource {
       where: 'id = ?',
       whereArgs: [invoiceId],
     );
+  }
+
+  @override
+  Future<void> updatePartialPayment(
+    int invoiceId,
+    String status,
+    double paidAmount,
+  ) async {
+    final db = await databaseHelper.database;
+    await db.update(
+      'invoices',
+      {
+        'payment_status': status,
+        'paid_amount': paidAmount,
+        'payment_date': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [invoiceId],
+    );
+  }
+
+  @override
+  Future<bool> validateInventoryQuantity(
+    int itemId,
+    int requestedQuantity,
+  ) async {
+    final availableStock = await getAvailableStock(itemId);
+    return availableStock >= requestedQuantity;
+  }
+
+  @override
+  Future<int> getAvailableStock(int itemId) async {
+    final db = await databaseHelper.database;
+    final result = await db.query(
+      'items',
+      columns: ['stock_quantity'],
+      where: 'id = ? AND is_active = ?',
+      whereArgs: [itemId, 1],
+    );
+
+    if (result.isNotEmpty) {
+      return (result.first['stock_quantity'] as int?) ?? 0;
+    }
+    return 0;
   }
 
   // Customer operations

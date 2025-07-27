@@ -13,6 +13,13 @@ abstract class BillingRepository {
   Future<void> updateInvoice(Invoice invoice);
   Future<void> deleteInvoice(int id);
   Future<void> updatePaymentStatus(int invoiceId, String status);
+  Future<void> updatePartialPayment(
+    int invoiceId,
+    String status,
+    double paidAmount,
+  );
+  Future<bool> validateInventoryQuantity(int itemId, int requestedQuantity);
+  Future<int> getAvailableStock(int itemId);
 
   // Customer operations
   Future<List<Customer>> getAllCustomers();

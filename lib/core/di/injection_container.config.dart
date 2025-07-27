@@ -35,6 +35,8 @@ import 'package:billmate/features/inventory/data/repositories/inventory_reposito
     as _i1065;
 import 'package:billmate/features/inventory/domain/repositories/inventory_repository.dart'
     as _i411;
+import 'package:billmate/features/inventory/domain/usecases/inventory_management_usecases.dart'
+    as _i520;
 import 'package:billmate/features/inventory/domain/usecases/inventory_usecases.dart'
     as _i576;
 import 'package:billmate/features/inventory/presentation/bloc/inventory_bloc.dart'
@@ -113,6 +115,29 @@ extension GetItInjectableX on _i174.GetIt {
     gh.factory<_i576.DeleteCategoryUseCase>(
       () => _i576.DeleteCategoryUseCase(gh<_i411.InventoryRepository>()),
     );
+    gh.factory<_i520.ReduceStockUseCase>(
+      () => _i520.ReduceStockUseCase(gh<_i411.InventoryRepository>()),
+    );
+    gh.factory<_i520.IncreaseStockUseCase>(
+      () => _i520.IncreaseStockUseCase(gh<_i411.InventoryRepository>()),
+    );
+    gh.factory<_i520.CheckStockAvailabilityUseCase>(
+      () =>
+          _i520.CheckStockAvailabilityUseCase(gh<_i411.InventoryRepository>()),
+    );
+    gh.factory<_i520.RecordInventoryTransactionUseCase>(
+      () => _i520.RecordInventoryTransactionUseCase(
+        gh<_i411.InventoryRepository>(),
+      ),
+    );
+    gh.factory<_i520.ReduceStockForInvoiceUseCase>(
+      () => _i520.ReduceStockForInvoiceUseCase(gh<_i411.InventoryRepository>()),
+    );
+    gh.factory<_i520.RestoreStockForCancelledInvoiceUseCase>(
+      () => _i520.RestoreStockForCancelledInvoiceUseCase(
+        gh<_i411.InventoryRepository>(),
+      ),
+    );
     gh.factory<_i1059.DashboardBloc>(
       () => _i1059.DashboardBloc(
         getAllItemsUseCase: gh<_i576.GetAllItemsUseCase>(),
@@ -166,6 +191,16 @@ extension GetItInjectableX on _i174.GetIt {
     gh.factory<_i137.UpdatePaymentStatusUseCase>(
       () => _i137.UpdatePaymentStatusUseCase(gh<_i677.BillingRepository>()),
     );
+    gh.factory<_i137.UpdatePartialPaymentUseCase>(
+      () => _i137.UpdatePartialPaymentUseCase(gh<_i677.BillingRepository>()),
+    );
+    gh.factory<_i137.ValidateInventoryQuantityUseCase>(
+      () =>
+          _i137.ValidateInventoryQuantityUseCase(gh<_i677.BillingRepository>()),
+    );
+    gh.factory<_i137.GetAvailableStockUseCase>(
+      () => _i137.GetAvailableStockUseCase(gh<_i677.BillingRepository>()),
+    );
     gh.factory<_i1067.GetAllCustomersUseCase>(
       () => _i1067.GetAllCustomersUseCase(gh<_i677.BillingRepository>()),
     );
@@ -183,6 +218,40 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.factory<_i1067.DeleteCustomerUseCase>(
       () => _i1067.DeleteCustomerUseCase(gh<_i677.BillingRepository>()),
+    );
+    gh.factory<_i59.BillingBloc>(
+      () => _i59.BillingBloc(
+        getAllInvoicesUseCase: gh<_i137.GetAllInvoicesUseCase>(),
+        getInvoiceByIdUseCase: gh<_i137.GetInvoiceByIdUseCase>(),
+        getInvoiceByNumberUseCase: gh<_i137.GetInvoiceByNumberUseCase>(),
+        getInvoicesByCustomerUseCase: gh<_i137.GetInvoicesByCustomerUseCase>(),
+        getInvoicesByDateRangeUseCase:
+            gh<_i137.GetInvoicesByDateRangeUseCase>(),
+        searchInvoicesUseCase: gh<_i137.SearchInvoicesUseCase>(),
+        createInvoiceUseCase: gh<_i137.CreateInvoiceUseCase>(),
+        updateInvoiceUseCase: gh<_i137.UpdateInvoiceUseCase>(),
+        deleteInvoiceUseCase: gh<_i137.DeleteInvoiceUseCase>(),
+        updatePaymentStatusUseCase: gh<_i137.UpdatePaymentStatusUseCase>(),
+        updatePartialPaymentUseCase: gh<_i137.UpdatePartialPaymentUseCase>(),
+        validateInventoryQuantityUseCase:
+            gh<_i137.ValidateInventoryQuantityUseCase>(),
+        getAvailableStockUseCase: gh<_i137.GetAvailableStockUseCase>(),
+        getAllCustomersUseCase: gh<_i1067.GetAllCustomersUseCase>(),
+        getCustomerByIdUseCase: gh<_i1067.GetCustomerByIdUseCase>(),
+        searchCustomersUseCase: gh<_i1067.SearchCustomersUseCase>(),
+        createCustomerUseCase: gh<_i1067.CreateCustomerUseCase>(),
+        updateCustomerUseCase: gh<_i1067.UpdateCustomerUseCase>(),
+        deleteCustomerUseCase: gh<_i1067.DeleteCustomerUseCase>(),
+        getBillingDashboardStatsUseCase:
+            gh<_i719.GetBillingDashboardStatsUseCase>(),
+        getSalesReportUseCase: gh<_i719.GetSalesReportUseCase>(),
+        getPaymentReportUseCase: gh<_i719.GetPaymentReportUseCase>(),
+        reduceStockForInvoiceUseCase: gh<_i520.ReduceStockForInvoiceUseCase>(),
+        restoreStockForCancelledInvoiceUseCase:
+            gh<_i520.RestoreStockForCancelledInvoiceUseCase>(),
+        checkStockAvailabilityUseCase:
+            gh<_i520.CheckStockAvailabilityUseCase>(),
+      ),
     );
     gh.factory<_i781.InventoryBloc>(
       () => _i781.InventoryBloc(
@@ -217,31 +286,6 @@ extension GetItInjectableX on _i174.GetIt {
     gh.factory<_i130.UpdateNextInvoiceNumberUseCase>(
       () =>
           _i130.UpdateNextInvoiceNumberUseCase(gh<_i748.SettingsRepository>()),
-    );
-    gh.factory<_i59.BillingBloc>(
-      () => _i59.BillingBloc(
-        getAllInvoicesUseCase: gh<_i137.GetAllInvoicesUseCase>(),
-        getInvoiceByIdUseCase: gh<_i137.GetInvoiceByIdUseCase>(),
-        getInvoiceByNumberUseCase: gh<_i137.GetInvoiceByNumberUseCase>(),
-        getInvoicesByCustomerUseCase: gh<_i137.GetInvoicesByCustomerUseCase>(),
-        getInvoicesByDateRangeUseCase:
-            gh<_i137.GetInvoicesByDateRangeUseCase>(),
-        searchInvoicesUseCase: gh<_i137.SearchInvoicesUseCase>(),
-        createInvoiceUseCase: gh<_i137.CreateInvoiceUseCase>(),
-        updateInvoiceUseCase: gh<_i137.UpdateInvoiceUseCase>(),
-        deleteInvoiceUseCase: gh<_i137.DeleteInvoiceUseCase>(),
-        updatePaymentStatusUseCase: gh<_i137.UpdatePaymentStatusUseCase>(),
-        getAllCustomersUseCase: gh<_i1067.GetAllCustomersUseCase>(),
-        getCustomerByIdUseCase: gh<_i1067.GetCustomerByIdUseCase>(),
-        searchCustomersUseCase: gh<_i1067.SearchCustomersUseCase>(),
-        createCustomerUseCase: gh<_i1067.CreateCustomerUseCase>(),
-        updateCustomerUseCase: gh<_i1067.UpdateCustomerUseCase>(),
-        deleteCustomerUseCase: gh<_i1067.DeleteCustomerUseCase>(),
-        getBillingDashboardStatsUseCase:
-            gh<_i719.GetBillingDashboardStatsUseCase>(),
-        getSalesReportUseCase: gh<_i719.GetSalesReportUseCase>(),
-        getPaymentReportUseCase: gh<_i719.GetPaymentReportUseCase>(),
-      ),
     );
     gh.factory<_i148.SettingsBloc>(
       () => _i148.SettingsBloc(

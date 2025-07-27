@@ -111,3 +111,36 @@ class UpdatePaymentStatusUseCase {
     return repository.updatePaymentStatus(invoiceId, status);
   }
 }
+
+@injectable
+class UpdatePartialPaymentUseCase {
+  final BillingRepository repository;
+
+  UpdatePartialPaymentUseCase(this.repository);
+
+  Future<void> call(int invoiceId, String status, double paidAmount) {
+    return repository.updatePartialPayment(invoiceId, status, paidAmount);
+  }
+}
+
+@injectable
+class ValidateInventoryQuantityUseCase {
+  final BillingRepository repository;
+
+  ValidateInventoryQuantityUseCase(this.repository);
+
+  Future<bool> call(int itemId, int requestedQuantity) {
+    return repository.validateInventoryQuantity(itemId, requestedQuantity);
+  }
+}
+
+@injectable
+class GetAvailableStockUseCase {
+  final BillingRepository repository;
+
+  GetAvailableStockUseCase(this.repository);
+
+  Future<int> call(int itemId) {
+    return repository.getAvailableStock(itemId);
+  }
+}

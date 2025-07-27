@@ -137,7 +137,7 @@ class _InvoiceListViewState extends State<InvoiceListView> {
               color: AppColors.cardBackground,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 10,
                   offset: const Offset(0, 2),
                 ),
@@ -205,7 +205,7 @@ class _InvoiceListViewState extends State<InvoiceListView> {
                                           );
                                         },
                                         selectedColor: AppColors.primary
-                                            .withOpacity(0.2),
+                                            .withValues(alpha: 0.2),
                                         checkmarkColor: AppColors.primary,
                                       ),
                                     ),
@@ -328,14 +328,16 @@ class _InvoiceListViewState extends State<InvoiceListView> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         heroTag: "createInvoiceFAB",
-        onPressed: () {
-          Navigator.push(
+        onPressed: () async {
+          final bloc = context.read<BillingBloc>();
+          await Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const CreateInvoicePage()),
-          ).then((_) {
-            // Refresh the list when returning from create page
-            context.read<BillingBloc>().add(LoadAllInvoices());
-          });
+          );
+          // Refresh the list when returning from create page
+          if (mounted) {
+            bloc.add(LoadAllInvoices());
+          }
         },
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
@@ -355,16 +357,18 @@ class _InvoiceListViewState extends State<InvoiceListView> {
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
-        onTap: () {
-          Navigator.push(
+        onTap: () async {
+          final bloc = context.read<BillingBloc>();
+          await Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => InvoiceDetailPage(invoice: invoice),
             ),
-          ).then((_) {
-            // Refresh the list when returning from detail page
-            context.read<BillingBloc>().add(LoadAllInvoices());
-          });
+          );
+          // Refresh the list when returning from detail page
+          if (mounted) {
+            bloc.add(LoadAllInvoices());
+          }
         },
         borderRadius: BorderRadius.circular(12),
         child: Padding(
@@ -392,7 +396,7 @@ class _InvoiceListViewState extends State<InvoiceListView> {
                     decoration: BoxDecoration(
                       color: _getStatusColor(
                         invoice.paymentStatus,
-                      ).withOpacity(0.1),
+                      ).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(

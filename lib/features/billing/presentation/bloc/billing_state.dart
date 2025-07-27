@@ -117,3 +117,33 @@ class PaymentReportLoaded extends BillingState {
   @override
   List<Object> get props => [report];
 }
+
+// Inventory States
+class InventoryValidated extends BillingState {
+  final bool isValid;
+  final int availableStock;
+
+  const InventoryValidated(this.isValid, this.availableStock);
+
+  @override
+  List<Object> get props => [isValid, availableStock];
+}
+
+class StockQuantityLoaded extends BillingState {
+  final int stockQuantity;
+
+  const StockQuantityLoaded(this.stockQuantity);
+
+  @override
+  List<Object> get props => [stockQuantity];
+}
+
+// Payment States
+class PartialPaymentUpdated extends BillingState {
+  final String message;
+
+  const PartialPaymentUpdated(this.message);
+
+  @override
+  List<Object> get props => [message];
+}

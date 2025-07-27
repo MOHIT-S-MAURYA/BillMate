@@ -12,6 +12,26 @@ abstract class InventoryRepository {
 
   // Stock management
   Future<void> updateStock(int itemId, int quantity);
+  Future<void> reduceStock(
+    int itemId,
+    int quantity, {
+    int? invoiceId,
+    String? notes,
+  });
+  Future<void> increaseStock(
+    int itemId,
+    int quantity, {
+    int? invoiceId,
+    String? notes,
+  });
+  Future<bool> checkStockAvailability(int itemId, int requiredQuantity);
+  Future<void> recordInventoryTransaction(
+    int itemId,
+    String transactionType,
+    int quantityChange, {
+    int? invoiceId,
+    String? notes,
+  });
   Future<List<Item>> getLowStockItems();
   Future<List<Item>> getOutOfStockItems();
 

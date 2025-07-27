@@ -126,6 +126,43 @@ class BillingRepositoryImpl implements BillingRepository {
     }
   }
 
+  @override
+  Future<void> updatePartialPayment(
+    int invoiceId,
+    String status,
+    double paidAmount,
+  ) async {
+    try {
+      await localDataSource.updatePartialPayment(invoiceId, status, paidAmount);
+    } catch (e) {
+      throw Exception('Failed to update partial payment: $e');
+    }
+  }
+
+  @override
+  Future<bool> validateInventoryQuantity(
+    int itemId,
+    int requestedQuantity,
+  ) async {
+    try {
+      return await localDataSource.validateInventoryQuantity(
+        itemId,
+        requestedQuantity,
+      );
+    } catch (e) {
+      throw Exception('Failed to validate inventory quantity: $e');
+    }
+  }
+
+  @override
+  Future<int> getAvailableStock(int itemId) async {
+    try {
+      return await localDataSource.getAvailableStock(itemId);
+    } catch (e) {
+      throw Exception('Failed to get available stock: $e');
+    }
+  }
+
   // Customer operations
   @override
   Future<List<Customer>> getAllCustomers() async {

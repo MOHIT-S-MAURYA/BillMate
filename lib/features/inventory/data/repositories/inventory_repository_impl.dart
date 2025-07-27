@@ -57,6 +57,63 @@ class InventoryRepositoryImpl implements InventoryRepository {
   }
 
   @override
+  Future<void> reduceStock(
+    int itemId,
+    int quantity, {
+    int? invoiceId,
+    String? notes,
+  }) async {
+    await localDataSource.reduceStock(
+      itemId,
+      quantity,
+      invoiceId: invoiceId,
+      notes: notes,
+    );
+  }
+
+  @override
+  Future<void> increaseStock(
+    int itemId,
+    int quantity, {
+    int? invoiceId,
+    String? notes,
+  }) async {
+    await localDataSource.increaseStock(
+      itemId,
+      quantity,
+      invoiceId: invoiceId,
+      notes: notes,
+    );
+  }
+
+  @override
+  Future<bool> checkStockAvailability(int itemId, int requiredQuantity) async {
+    return await localDataSource.checkStockAvailability(
+      itemId,
+      requiredQuantity,
+    );
+  }
+
+  @override
+  Future<void> recordInventoryTransaction(
+    int itemId,
+    String transactionType,
+    int quantityChange, {
+    int? invoiceId,
+    String? notes,
+  }) async {
+    final transaction = {
+      'item_id': itemId,
+      'transaction_type': transactionType,
+      'quantity_change': quantityChange,
+      'invoice_id': invoiceId,
+      'notes': notes ?? '',
+      'created_at': DateTime.now().toIso8601String(),
+    };
+    await localDataSource.createInventoryTransaction(transaction);
+  }
+
+  @override
   Future<List<Item>> getLowStockItems() async {
     final itemModels = await localDataSource.getLowStockItems();
     return itemModels.map((model) => model.toEntity()).toList();

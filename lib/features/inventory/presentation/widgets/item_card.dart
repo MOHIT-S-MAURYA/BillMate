@@ -83,15 +83,15 @@ class _ItemCardState extends State<ItemCard>
                   border: Border.all(
                     color:
                         isOutOfStock
-                            ? AppColors.error.withOpacity(0.3)
+                            ? AppColors.error.withValues(alpha: 0.3)
                             : isLowStock
-                            ? Colors.orange.withOpacity(0.3)
+                            ? Colors.orange.withValues(alpha: 0.3)
                             : Colors.grey.shade200,
                     width: 1.5,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
+                      color: Colors.black.withValues(alpha: 0.08),
                       blurRadius: 15,
                       offset: const Offset(0, 5),
                       spreadRadius: 1,
@@ -195,7 +195,7 @@ class _ItemCardState extends State<ItemCard>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: bgColor.withOpacity(0.3),
+            color: bgColor.withValues(alpha: 0.3),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -225,12 +225,12 @@ class _ItemCardState extends State<ItemCard>
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            AppColors.primary.withOpacity(0.1),
-            AppColors.primary.withOpacity(0.05),
+            AppColors.primary.withValues(alpha: 0.1),
+            AppColors.primary.withValues(alpha: 0.05),
           ],
         ),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -312,9 +312,9 @@ class _ItemCardState extends State<ItemCard>
       child: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.3)),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
         child: Icon(icon, color: color, size: 18),
       ),
@@ -330,12 +330,12 @@ class _ItemCardState extends State<ItemCard>
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              AppColors.success.withOpacity(0.1),
-              AppColors.success.withOpacity(0.05),
+              AppColors.success.withValues(alpha: 0.1),
+              AppColors.success.withValues(alpha: 0.05),
             ],
           ),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.success.withOpacity(0.3)),
+          border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -391,9 +391,9 @@ class _ItemCardState extends State<ItemCard>
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.05),
+        color: color.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [

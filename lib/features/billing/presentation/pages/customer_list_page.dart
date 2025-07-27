@@ -74,7 +74,7 @@ class _CustomerListViewState extends State<CustomerListView> {
               color: AppColors.cardBackground,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 10,
                   offset: const Offset(0, 2),
                 ),
@@ -246,7 +246,7 @@ class _CustomerListViewState extends State<CustomerListView> {
               Row(
                 children: [
                   CircleAvatar(
-                    backgroundColor: AppColors.primary.withOpacity(0.1),
+                    backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                     child: Text(
                       customer.name.isNotEmpty
                           ? customer.name[0].toUpperCase()

@@ -8,6 +8,9 @@ import 'package:billmate/features/inventory/presentation/widgets/item_card.dart'
 import 'package:billmate/features/inventory/presentation/widgets/inventory_stats_card.dart';
 import 'package:billmate/features/inventory/domain/entities/item.dart';
 import 'package:billmate/shared/constants/app_colors.dart';
+import 'package:billmate/core/events/inventory_events.dart' as events;
+import 'package:billmate/core/navigation/modern_navigation_widgets.dart';
+import 'dart:async';
 
 class InventoryPage extends StatelessWidget {
   const InventoryPage({super.key});
@@ -33,6 +36,7 @@ class _InventoryViewState extends State<InventoryView>
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  StreamSubscription<events.InventoryEvent>? _inventoryEventSubscription;
 
   @override
   void initState() {
@@ -48,12 +52,42 @@ class _InventoryViewState extends State<InventoryView>
         context.read<InventoryBloc>().add(SearchItems(_searchQuery));
       }
     });
+
+    // Listen to inventory events for auto-refresh
+    _inventoryEventSubscription = events.InventoryEventBus().events.listen((
+      event,
+    ) {
+      if (event.type == events.InventoryEventType.stockChanged) {
+        // Auto-refresh inventory when stock changes
+        _refreshInventory();
+      }
+    });
+  }
+
+  void _refreshInventory() {
+    if (_searchQuery.isEmpty) {
+      context.read<InventoryBloc>().add(LoadAllItems());
+    } else {
+      context.read<InventoryBloc>().add(SearchItems(_searchQuery));
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Refresh inventory data when returning to this page
+    if (_searchQuery.isEmpty) {
+      context.read<InventoryBloc>().add(LoadAllItems());
+    } else {
+      context.read<InventoryBloc>().add(SearchItems(_searchQuery));
+    }
   }
 
   @override
   void dispose() {
     _tabController.dispose();
     _searchController.dispose();
+    _inventoryEventSubscription?.cancel();
     super.dispose();
   }
 
@@ -87,6 +121,11 @@ class _InventoryViewState extends State<InventoryView>
         borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
       ),
       actions: [
+        IconButton(
+          onPressed: _refreshInventory,
+          icon: const Icon(Icons.refresh),
+          tooltip: 'Refresh inventory',
+        ),
         IconButton(
           onPressed: () => _showInventoryMenu(context),
           icon: const Icon(Icons.more_vert),
@@ -343,31 +382,38 @@ class _InventoryViewState extends State<InventoryView>
           ),
         ),
         Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: items.length,
-            itemBuilder: (context, index) {
-              final item = items[index];
-              final category = categories.firstWhere(
-                (cat) => cat.id == item.categoryId,
-                orElse:
-                    () => Category(
-                      id: 0,
-                      name: 'Uncategorized',
-                      isActive: true,
-                      createdAt: DateTime.now(),
-                      updatedAt: DateTime.now(),
-                    ),
-              );
-
-              return ItemCard(
-                item: item,
-                category: category,
-                onEdit: () => _showEditItemDialog(item),
-                onDelete: () => _showDeleteItemDialog(item),
-                onStockUpdate: (newStock) => _updateStock(item.id!, newStock),
-              );
+          child: RefreshIndicator(
+            onRefresh: () async {
+              _refreshInventory();
+              // Wait a bit for the refresh to complete
+              await Future.delayed(const Duration(milliseconds: 500));
             },
+            child: ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: items.length,
+              itemBuilder: (context, index) {
+                final item = items[index];
+                final category = categories.firstWhere(
+                  (cat) => cat.id == item.categoryId,
+                  orElse:
+                      () => Category(
+                        id: 0,
+                        name: 'Uncategorized',
+                        isActive: true,
+                        createdAt: DateTime.now(),
+                        updatedAt: DateTime.now(),
+                      ),
+                );
+
+                return ItemCard(
+                  item: item,
+                  category: category,
+                  onEdit: () => _showEditItemDialog(item),
+                  onDelete: () => _showDeleteItemDialog(item),
+                  onStockUpdate: (newStock) => _updateStock(item.id!, newStock),
+                );
+              },
+            ),
           ),
         ),
       ],
@@ -813,31 +859,21 @@ class _InventoryViewState extends State<InventoryView>
         // Show different FAB based on current tab
         if (_tabController.index == 2) {
           // Categories tab
-          return FloatingActionButton.extended(
+          return ModernFloatingActionButtonExtended(
             heroTag: "categoryFAB",
             onPressed: () => _showAddCategoryDialog(context),
             backgroundColor: AppColors.secondary,
-            foregroundColor: Colors.white,
             icon: const Icon(Icons.category),
             label: const Text('Add Category'),
-            elevation: 8,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
           );
         } else {
           // All Items or Low Stock tabs
-          return FloatingActionButton.extended(
+          return ModernFloatingActionButtonExtended(
             heroTag: "inventoryFAB",
             onPressed: () => _showAddItemDialog(context),
             backgroundColor: AppColors.primary,
-            foregroundColor: Colors.white,
             icon: const Icon(Icons.add),
             label: const Text('Add Item'),
-            elevation: 8,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
           );
         }
       },
@@ -862,30 +898,29 @@ class _InventoryViewState extends State<InventoryView>
                 ),
                 const SizedBox(height: 20),
                 ListTile(
-                  leading: const Icon(Icons.add, color: AppColors.primary),
-                  title: const Text('Add Item'),
+                  leading: const Icon(Icons.refresh, color: AppColors.info),
+                  title: const Text('Refresh Inventory'),
+                  subtitle: const Text('Reload all items and categories'),
                   onTap: () {
                     Navigator.pop(context);
-                    _showAddItemDialog(context);
+                    context.read<InventoryBloc>().add(LoadAllItems());
                   },
                 ),
                 ListTile(
                   leading: const Icon(
-                    Icons.category,
-                    color: AppColors.secondary,
+                    Icons.analytics,
+                    color: AppColors.warning,
                   ),
-                  title: const Text('Add Category'),
+                  title: const Text('Inventory Report'),
+                  subtitle: const Text('View detailed inventory analytics'),
                   onTap: () {
                     Navigator.pop(context);
-                    _showAddCategoryDialog(context);
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.refresh, color: AppColors.info),
-                  title: const Text('Refresh'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    context.read<InventoryBloc>().add(LoadAllItems());
+                    // TODO: Implement inventory report
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Inventory report feature coming soon!'),
+                      ),
+                    );
                   },
                 ),
               ],
@@ -984,7 +1019,7 @@ class _InventoryViewState extends State<InventoryView>
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.1),
+                          color: AppColors.primary.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Icon(
@@ -1112,7 +1147,7 @@ class _InventoryViewState extends State<InventoryView>
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.1),
+                          color: AppColors.primary.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Icon(
@@ -1233,7 +1268,7 @@ class _InventoryViewState extends State<InventoryView>
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: AppColors.error.withOpacity(0.1),
+                      color: AppColors.error.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(Icons.delete, color: AppColors.error, size: 20),

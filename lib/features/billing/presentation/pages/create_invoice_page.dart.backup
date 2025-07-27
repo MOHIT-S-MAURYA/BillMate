@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:decimal/decimal.dart';
@@ -9,8 +10,6 @@ import 'package:billmate/features/inventory/domain/entities/item.dart';
 import 'package:billmate/features/inventory/presentation/bloc/inventory_bloc.dart';
 import 'package:billmate/features/billing/services/pdf_service.dart';
 import 'package:billmate/core/di/injection_container.dart';
-import 'package:billmate/core/navigation/modern_navigation_widgets.dart';
-import 'package:billmate/core/navigation/navigation_service.dart';
 
 class CreateInvoicePage extends StatelessWidget {
   const CreateInvoicePage({super.key});
@@ -121,83 +120,85 @@ class _CreateInvoiceViewState extends State<CreateInvoiceView> {
   void _addItem() {
     final inventoryBloc = context.read<InventoryBloc>();
     final billingBloc = context.read<BillingBloc>();
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder:
+          (dialogContext) => MultiBlocProvider(
+            providers: [
+              BlocProvider.value(value: inventoryBloc),
+              BlocProvider.value(value: billingBloc),
+            ],
+            child: _AddItemDialog(
+              onItemAdded: (item) {
+                setState(() {
+                  // Check if item with same itemId and discount already exists
+                  final existingIndex = _items.indexWhere((existingItem) {
+                    final sameItemId = existingItem.itemId == item.itemId;
+                    final sameDiscount =
+                        (existingItem.discountPercent.toDouble() -
+                                item.discountPercent.toDouble())
+                            .abs() <
+                        0.01;
+                    return sameItemId && sameDiscount;
+                  });
 
-    context.showModernDialog(
-      child: MultiBlocProvider(
-        providers: [
-          BlocProvider.value(value: inventoryBloc),
-          BlocProvider.value(value: billingBloc),
-        ],
-        child: _AddItemDialog(
-          onItemAdded: (item) {
-            setState(() {
-              // Check if item with same itemId and discount already exists
-              final existingIndex = _items.indexWhere((existingItem) {
-                final sameItemId = existingItem.itemId == item.itemId;
-                final sameDiscount =
-                    (existingItem.discountPercent.toDouble() -
-                            item.discountPercent.toDouble())
-                        .abs() <
-                    0.01;
-                return sameItemId && sameDiscount;
-              });
+                  if (existingIndex != -1) {
+                    // Update existing item's quantity and recalculate line total
+                    final existingItem = _items[existingIndex];
+                    final newQuantity = existingItem.quantity + item.quantity;
 
-              if (existingIndex != -1) {
-                // Update existing item's quantity and recalculate line total
-                final existingItem = _items[existingIndex];
-                final newQuantity = existingItem.quantity + item.quantity;
+                    // Recalculate line total with new quantity
+                    final updatedItem = InvoiceItem(
+                      invoiceId: existingItem.invoiceId,
+                      itemId: existingItem.itemId,
+                      quantity: newQuantity,
+                      unitPrice: existingItem.unitPrice,
+                      discountPercent: existingItem.discountPercent,
+                      taxRate: existingItem.taxRate,
+                      lineTotal: _calculateLineTotal(
+                        existingItem.unitPrice,
+                        newQuantity,
+                        existingItem.discountPercent,
+                      ),
+                      createdAt: existingItem.createdAt,
+                      itemName: existingItem.itemName,
+                      itemDescription: existingItem.itemDescription,
+                      unit: existingItem.unit,
+                    );
 
-                // Recalculate line total with new quantity
-                final updatedItem = InvoiceItem(
-                  invoiceId: existingItem.invoiceId,
-                  itemId: existingItem.itemId,
-                  quantity: newQuantity,
-                  unitPrice: existingItem.unitPrice,
-                  discountPercent: existingItem.discountPercent,
-                  taxRate: existingItem.taxRate,
-                  lineTotal: _calculateLineTotal(
-                    existingItem.unitPrice,
-                    newQuantity,
-                    existingItem.discountPercent,
-                  ),
-                  createdAt: existingItem.createdAt,
-                  itemName: existingItem.itemName,
-                  itemDescription: existingItem.itemDescription,
-                  unit: existingItem.unit,
-                );
+                    _items[existingIndex] = updatedItem;
 
-                _items[existingIndex] = updatedItem;
+                    // Show update message
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          '${item.itemName} quantity updated (${newQuantity})',
+                        ),
+                        backgroundColor: AppColors.success,
+                        behavior: SnackBarBehavior.floating,
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  } else {
+                    // Add new item
+                    _items.add(item);
 
-                // Show update message
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      '${item.itemName} quantity updated ($newQuantity)',
-                    ),
-                    backgroundColor: AppColors.success,
-                    behavior: SnackBarBehavior.floating,
-                    duration: const Duration(seconds: 2),
-                  ),
-                );
-              } else {
-                // Add new item
-                _items.add(item);
-
-                // Show add message
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('${item.itemName} added to invoice'),
-                    backgroundColor: AppColors.success,
-                    behavior: SnackBarBehavior.floating,
-                    duration: const Duration(seconds: 2),
-                  ),
-                );
-              }
-            });
-          },
-          existingItems: _items,
-        ),
-      ),
+                    // Show add message
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('${item.itemName} added to invoice'),
+                        backgroundColor: AppColors.success,
+                        behavior: SnackBarBehavior.floating,
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                });
+              },
+              existingItems: _items,
+            ),
+          ),
     );
   }
 
@@ -210,66 +211,72 @@ class _CreateInvoiceViewState extends State<CreateInvoiceView> {
   Future<void> _showPartialPaymentDialog() async {
     final TextEditingController paidAmountController = TextEditingController();
 
-    return context.showModernDialog<void>(
-      child: AlertDialog(
-        title: const Text('Partial Payment'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Total Amount: ₹${_totalAmount.toStringAsFixed(2)}'),
-            const SizedBox(height: 16),
-            TextField(
-              controller: paidAmountController,
-              decoration: const InputDecoration(
-                labelText: 'Enter Paid Amount',
-                prefixText: '₹ ',
-                border: OutlineInputBorder(),
-              ),
-              keyboardType: TextInputType.number,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              setState(() {
-                _paymentStatus = 'pending';
-              });
-              context.goBack();
-            },
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final paidAmount = Decimal.tryParse(paidAmountController.text);
-              if (paidAmount == null || paidAmount < Decimal.zero) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Please enter a valid amount')),
-                );
-                return;
-              }
-
-              if (paidAmount > _totalAmount) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Paid amount cannot exceed total amount'),
+    return showDialog<void>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Partial Payment'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Total Amount: ₹${_totalAmount.toStringAsFixed(2)}'),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: paidAmountController,
+                  decoration: const InputDecoration(
+                    labelText: 'Enter Paid Amount',
+                    prefixText: '₹ ',
+                    border: OutlineInputBorder(),
                   ),
-                );
-                return;
-              }
+                  keyboardType: TextInputType.number,
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    _paymentStatus = 'pending';
+                  });
+                  Navigator.pop(context);
+                },
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  final paidAmount = Decimal.tryParse(
+                    paidAmountController.text,
+                  );
+                  if (paidAmount == null || paidAmount < Decimal.zero) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Please enter a valid amount'),
+                      ),
+                    );
+                    return;
+                  }
 
-              setState(() {
-                _paidAmount = paidAmount;
-                _paymentDate = DateTime.now();
-              });
+                  if (paidAmount > _totalAmount) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Paid amount cannot exceed total amount'),
+                      ),
+                    );
+                    return;
+                  }
 
-              context.goBack();
-            },
-            child: const Text('Confirm'),
+                  setState(() {
+                    _paidAmount = paidAmount;
+                    _paymentDate = DateTime.now();
+                  });
+
+                  Navigator.pop(context);
+                },
+                child: const Text('Confirm'),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 
@@ -376,84 +383,103 @@ class _CreateInvoiceViewState extends State<CreateInvoiceView> {
 
   @override
   Widget build(BuildContext context) {
-    return ModernNavigationPage(
-      enableSwipeBack: true,
-      child: Scaffold(
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
         backgroundColor: AppColors.background,
-        appBar: ModernAppBar(
-          title: 'Create Invoice',
-          backgroundColor: AppColors.background,
-          actions: [
-            TextButton.icon(
-              onPressed: _previewAndPrint,
-              icon: const Icon(Icons.print, color: AppColors.secondary),
-              label: const Text(
-                'Print',
-                style: TextStyle(
-                  color: AppColors.secondary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            TextButton.icon(
-              onPressed: _saveInvoice,
-              icon: const Icon(Icons.save, color: AppColors.primary),
-              label: const Text(
-                'Save',
-                style: TextStyle(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-          ],
+        elevation: 0,
+        title: const Text(
+          'Create Invoice',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+          ),
         ),
-        body: BlocListener<BillingBloc, BillingState>(
-          listener: (context, state) {
-            if (state is BillingError) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Error: ${state.message}')),
-              );
-            } else if (state is InvoiceCreated) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Invoice created successfully!')),
-              );
-              context.goBack();
-            }
-          },
-          child: Form(
-            key: _formKey,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildCustomerSection(),
-                  const SizedBox(height: 24),
-                  _buildInvoiceDetailsSection(),
-                  const SizedBox(height: 24),
-                  _buildItemsSection(),
-                  const SizedBox(height: 24),
-                  _buildSummarySection(),
-                  const SizedBox(height: 24),
-                  _buildNotesSection(),
-                  const SizedBox(
-                    height: 100,
-                  ), // Space for floating action button
-                ],
+        leading: IconButton(
+          onPressed: () => Navigator.of(context).pop(),
+          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+        ),
+        actions: [
+          TextButton.icon(
+            onPressed: _previewAndPrint,
+            icon: const Icon(Icons.print, color: AppColors.secondary),
+            label: const Text(
+              'Print',
+              style: TextStyle(
+                color: AppColors.secondary,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
-        ),
-        floatingActionButton: ModernFloatingActionButtonExtended(
-          heroTag: "addItemFAB",
-          onPressed: _addItem,
-          icon: const Icon(Icons.add),
-          label: Text(_items.isEmpty ? 'Add First Item' : 'Add Another Item'),
+          const SizedBox(width: 8),
+          TextButton.icon(
+            onPressed: _saveInvoice,
+            icon: const Icon(Icons.save, color: AppColors.primary),
+            label: const Text(
+              'Save',
+              style: TextStyle(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
+      body: BlocListener<BillingBloc, BillingState>(
+        listener: (context, state) {
+          if (state is BillingError) {
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text('Error: ${state.message}')));
+          } else if (state is InvoiceCreated) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Invoice created successfully!')),
+            );
+            Navigator.of(context).pop();
+          }
+        },
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildCustomerSection(),
+                const SizedBox(height: 24),
+                _buildInvoiceDetailsSection(),
+                const SizedBox(height: 24),
+                _buildItemsSection(),
+                const SizedBox(height: 24),
+                _buildSummarySection(),
+                const SizedBox(height: 24),
+                _buildNotesSection(),
+                const SizedBox(height: 100), // Space for floating action button
+              ],
+            ),
+          ),
         ),
       ),
+      floatingActionButton:
+          _items.isEmpty
+              ? FloatingActionButton.extended(
+                heroTag: "addFirstItemFAB",
+                onPressed: _addItem,
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                icon: const Icon(Icons.add),
+                label: const Text('Add First Item'),
+              )
+              : FloatingActionButton(
+                heroTag: "addItemFAB",
+                onPressed: _addItem,
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                child: const Icon(Icons.add),
+                tooltip: 'Add Another Item',
+              ),
     );
   }
 
@@ -513,11 +539,9 @@ class _CreateInvoiceViewState extends State<CreateInvoiceView> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
+                color: AppColors.primary.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: AppColors.primary.withValues(alpha: 0.3),
-                ),
+                border: Border.all(color: AppColors.primary.withOpacity(0.3)),
               ),
               child: Row(
                 children: [
@@ -742,7 +766,7 @@ class _CreateInvoiceViewState extends State<CreateInvoiceView> {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.1),
+                    color: AppColors.primary.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
@@ -793,7 +817,7 @@ class _CreateInvoiceViewState extends State<CreateInvoiceView> {
               Container(
                 decoration: BoxDecoration(
                   border: Border.all(
-                    color: AppColors.borderColor.withValues(alpha: 0.3),
+                    color: AppColors.borderColor.withOpacity(0.3),
                   ),
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -865,7 +889,7 @@ class _CreateInvoiceViewState extends State<CreateInvoiceView> {
                       separatorBuilder:
                           (context, index) => Divider(
                             height: 1,
-                            color: AppColors.borderColor.withValues(alpha: 0.3),
+                            color: AppColors.borderColor.withOpacity(0.3),
                           ),
                       itemBuilder: (context, index) {
                         final item = _items[index];
@@ -958,6 +982,48 @@ class _CreateInvoiceViewState extends State<CreateInvoiceView> {
                   ],
                 ),
               ),
+            if (_items.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.add_circle_outline,
+                      color: AppColors.primary,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Add more items to this invoice',
+                        style: TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed: _addItem,
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('Add Item'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -982,12 +1048,12 @@ class _CreateInvoiceViewState extends State<CreateInvoiceView> {
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [const Text('Subtotal:'), Text('₹$_subtotal')],
+              children: [const Text('Subtotal:'), Text('₹${_subtotal}')],
             ),
             const SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [const Text('Tax:'), Text('₹$_taxAmount')],
+              children: [const Text('Tax:'), Text('₹${_taxAmount}')],
             ),
             const Divider(),
             Row(
@@ -998,7 +1064,7 @@ class _CreateInvoiceViewState extends State<CreateInvoiceView> {
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
                 Text(
-                  '₹$_totalAmount',
+                  '₹${_totalAmount}',
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
@@ -1059,174 +1125,182 @@ class _AddItemDialog extends StatefulWidget {
 
 class _AddItemDialogState extends State<_AddItemDialog> {
   final _formKey = GlobalKey<FormState>();
-  final _quantityController = TextEditingController();
+  final _quantityController = TextEditingController(text: '1');
   final _discountController = TextEditingController(text: '0');
 
   Item? _selectedItem;
-  InvoiceItem? _existingItem;
-  bool _itemAlreadyExists = false;
+  int _availableStock = 0;
+  bool _stockLoading = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _quantityController.addListener(_onQuantityChanged);
-    _discountController.addListener(_onDiscountChanged);
+  Decimal get _quantity =>
+      Decimal.tryParse(_quantityController.text) ?? Decimal.one;
+  Decimal get _discount =>
+      Decimal.tryParse(_discountController.text) ?? Decimal.zero;
+  Decimal get _unitPrice => _selectedItem?.sellingPrice ?? Decimal.zero;
+  Decimal get _taxRate => _selectedItem?.taxRate ?? Decimal.zero;
+  Decimal get _lineTotal {
+    if (_selectedItem == null) return Decimal.zero;
+
+    try {
+      // Convert to double for calculation to avoid Rational issues
+      final unitPrice = double.parse(_unitPrice.toString());
+      final quantity = double.parse(_quantity.toString());
+      final discount = double.parse(_discount.toString());
+
+      // Calculate using doubles
+      final subtotal = unitPrice * quantity;
+      final discountAmount = subtotal * (discount / 100);
+      final finalAmount = subtotal - discountAmount;
+
+      // Convert back to Decimal with proper precision
+      return Decimal.parse(finalAmount.toStringAsFixed(2));
+    } catch (e) {
+      return Decimal.zero;
+    }
   }
 
   @override
   void dispose() {
-    _quantityController.removeListener(_onQuantityChanged);
-    _discountController.removeListener(_onDiscountChanged);
     _quantityController.dispose();
     _discountController.dispose();
     super.dispose();
   }
 
-  void _onQuantityChanged() {
-    _checkItemExists();
-  }
-
-  void _onDiscountChanged() {
-    setState(() {});
-  }
-
-  void _checkItemExists() {
-    if (_selectedItem == null) return;
-
-    final existingItem = widget.existingItems.firstWhere(
-      (item) => item.itemId == _selectedItem!.id,
-      orElse:
-          () => InvoiceItem(
-            id: null,
-            invoiceId: 0,
-            itemId: -1,
-            quantity: Decimal.zero,
-            unitPrice: Decimal.zero,
-            taxRate: Decimal.zero,
-            discountPercent: Decimal.zero,
-            lineTotal: Decimal.zero,
-            createdAt: DateTime.now(),
-            itemName: '',
-          ),
-    );
-
+  void _loadAvailableStock(int itemId) {
     setState(() {
-      _itemAlreadyExists = existingItem.itemId != -1;
-      _existingItem = _itemAlreadyExists ? existingItem : null;
+      _stockLoading = true;
     });
-  }
-
-  Decimal get _quantity {
-    return Decimal.tryParse(_quantityController.text) ?? Decimal.zero;
-  }
-
-  Decimal get _discount {
-    return Decimal.tryParse(_discountController.text) ?? Decimal.zero;
-  }
-
-  Decimal get _unitPrice {
-    return _selectedItem?.sellingPrice ?? Decimal.zero;
-  }
-
-  Decimal get _taxRate {
-    return _selectedItem?.taxRate ?? Decimal.zero;
-  }
-
-  Decimal get _subtotal {
-    return _unitPrice * _quantity;
-  }
-
-  Decimal get _discountAmount {
-    return (_subtotal * _discount / Decimal.fromInt(100)).toDecimal();
-  }
-
-  Decimal get _taxableAmount {
-    return _subtotal - _discountAmount;
-  }
-
-  Decimal get _taxAmount {
-    return (_taxableAmount * _taxRate / Decimal.fromInt(100)).toDecimal();
-  }
-
-  Decimal get _lineTotal {
-    return _taxableAmount + _taxAmount;
+    context.read<BillingBloc>().add(GetAvailableStock(itemId));
   }
 
   int get _totalRequestedQuantity {
-    final currentQuantity = _quantity.toBigInt().toInt();
-    final existingQuantity = _existingItem?.quantity.toBigInt().toInt() ?? 0;
-    return currentQuantity + existingQuantity;
+    if (_selectedItem == null) return 0;
+    
+    // Calculate how much of this item is already in the invoice
+    final existingQuantity = widget.existingItems
+        .where((item) => item.itemId == _selectedItem!.id!)
+        .fold(0.0, (sum, item) => sum + item.quantity.toDouble());
+    
+    return (existingQuantity + _quantity.toDouble()).round();
+  }
+
+  bool get _itemAlreadyExists {
+    if (_selectedItem == null) return false;
+    return widget.existingItems.any(
+      (existingItem) =>
+          existingItem.itemId == _selectedItem!.id! &&
+          existingItem.discountPercent == _discount,
+    );
+  }
+
+  InvoiceItem? get _existingItem {
+    if (_selectedItem == null) return null;
+    try {
+      return widget.existingItems.firstWhere(
+        (existingItem) =>
+            existingItem.itemId == _selectedItem!.id! &&
+            existingItem.discountPercent == _discount,
+      );
+    } catch (e) {
+      return null;
+    }
   }
 
   void _addItem() {
-    if (!_formKey.currentState!.validate()) return;
+    if (_formKey.currentState!.validate() && _selectedItem != null) {
+      final item = InvoiceItem(
+        invoiceId: 0, // Will be set when invoice is created
+        itemId: _selectedItem!.id!,
+        quantity: _quantity,
+        unitPrice: _unitPrice,
+        discountPercent: _discount,
+        taxRate: _taxRate,
+        lineTotal: _lineTotal,
+        createdAt: DateTime.now(),
+        itemName: _selectedItem!.name,
+        itemDescription: _selectedItem!.description,
+        unit: _selectedItem!.unit,
+      );
 
-    final invoiceItem = InvoiceItem(
-      id: null,
-      invoiceId: 0,
-      itemId: _selectedItem!.id!,
-      quantity: _quantity,
-      unitPrice: _unitPrice,
-      taxRate: _taxRate,
-      discountPercent: _discount,
-      lineTotal: _lineTotal,
-      createdAt: DateTime.now(),
-      itemName: _selectedItem!.name,
-    );
+      // Add the item
+      widget.onItemAdded(item);
 
-    widget.onItemAdded(invoiceItem);
-    context.goBack();
+      // Close the dialog immediately to prevent duplicate additions
+      Navigator.of(context).pop();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        constraints: const BoxConstraints(maxWidth: 500),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Add Item',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 24),
-              BlocBuilder<InventoryBloc, InventoryState>(
-                builder: (context, state) {
-                  if (state is ItemsLoaded) {
-                    return DropdownButtonFormField<Item>(
-                      value: _selectedItem,
-                      decoration: const InputDecoration(
-                        labelText: 'Select Item',
-                        border: OutlineInputBorder(),
-                      ),
-                      items:
-                          state.items.map((item) {
-                            return DropdownMenuItem(
-                              value: item,
-                              child: Text(
-                                '${item.name} - ₹${item.sellingPrice} (Stock: ${item.stockQuantity})',
-                              ),
-                            );
-                          }).toList(),
-                      onChanged: (item) {
-                        setState(() {
-                          _selectedItem = item;
-                        });
-                      },
-                      validator: (value) {
-                        if (value == null) return 'Please select an item';
-                        return null;
-                      },
-                    );
-                  }
-                  return const LinearProgressIndicator();
-                },
-              ),
+    return BlocListener<BillingBloc, BillingState>(
+      listener: (context, state) {
+        if (state is StockQuantityLoaded) {
+          setState(() {
+            _availableStock = state.stockQuantity;
+            _stockLoading = false;
+          });
+        } else if (state is BillingError) {
+          setState(() {
+            _stockLoading = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error loading stock: ${state.message}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      },
+      child: Dialog(
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          constraints: const BoxConstraints(maxWidth: 500),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Add Item',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 24),
+                BlocBuilder<InventoryBloc, InventoryState>(
+                  builder: (context, state) {
+                    if (state is ItemsLoaded) {
+                      return DropdownButtonFormField<Item>(
+                        value: _selectedItem,
+                        decoration: const InputDecoration(
+                          labelText: 'Select Item',
+                          border: OutlineInputBorder(),
+                        ),
+                        items:
+                            state.items.map((item) {
+                              return DropdownMenuItem(
+                                value: item,
+                                child: Text(
+                                  '${item.name} - ₹${item.sellingPrice} (Stock: ${item.stockQuantity})',
+                                ),
+                              );
+                            }).toList(),
+                        onChanged: (item) {
+                          setState(() {
+                            _selectedItem = item;
+                            if (item != null && item.id != null) {
+                              _loadAvailableStock(item.id!);
+                            }
+                          });
+                        },
+                        validator: (value) {
+                          if (value == null) return 'Please select an item';
+                          return null;
+                        },
+                      );
+                    }
+                    return const LinearProgressIndicator();
+                  },
+                ),
               const SizedBox(height: 16),
               Row(
                 children: [
@@ -1245,17 +1319,17 @@ class _AddItemDialogState extends State<_AddItemDialog> {
                             Decimal.parse(value) <= Decimal.zero) {
                           return 'Enter valid quantity';
                         }
-
+                        
                         // Check inventory availability
                         if (_selectedItem != null) {
                           final totalRequested = _totalRequestedQuantity;
                           final availableStock = _selectedItem!.stockQuantity;
-
+                          
                           if (totalRequested > availableStock) {
                             return 'Only $availableStock available in stock';
                           }
                         }
-
+                        
                         return null;
                       },
                     ),
@@ -1291,10 +1365,10 @@ class _AddItemDialogState extends State<_AddItemDialog> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: AppColors.warning.withValues(alpha: 0.1),
+                      color: AppColors.warning.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
-                        color: AppColors.warning.withValues(alpha: 0.3),
+                        color: AppColors.warning.withOpacity(0.3),
                       ),
                     ),
                     child: Row(
@@ -1365,7 +1439,7 @@ class _AddItemDialogState extends State<_AddItemDialog> {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   TextButton(
-                    onPressed: () => context.goBack(),
+                    onPressed: () => Navigator.of(context).pop(),
                     child: const Text('Cancel'),
                   ),
                   const SizedBox(width: 8),

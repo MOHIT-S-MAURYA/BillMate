@@ -1,10 +1,11 @@
-import 'package:bloc/bloc.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:billmate/features/billing/domain/entities/invoice.dart';
 import 'package:billmate/features/billing/domain/entities/customer.dart';
 import 'package:billmate/features/billing/domain/usecases/invoice_usecases.dart';
 import 'package:billmate/features/billing/domain/usecases/customer_usecases.dart';
 import 'package:billmate/features/billing/domain/usecases/analytics_usecases.dart';
+import 'package:billmate/features/inventory/domain/usecases/inventory_management_usecases.dart';
 import 'package:injectable/injectable.dart';
 
 part 'billing_event.dart';
@@ -22,6 +23,9 @@ class BillingBloc extends Bloc<BillingEvent, BillingState> {
   final UpdateInvoiceUseCase updateInvoiceUseCase;
   final DeleteInvoiceUseCase deleteInvoiceUseCase;
   final UpdatePaymentStatusUseCase updatePaymentStatusUseCase;
+  final UpdatePartialPaymentUseCase updatePartialPaymentUseCase;
+  final ValidateInventoryQuantityUseCase validateInventoryQuantityUseCase;
+  final GetAvailableStockUseCase getAvailableStockUseCase;
 
   final GetAllCustomersUseCase getAllCustomersUseCase;
   final GetCustomerByIdUseCase getCustomerByIdUseCase;
@@ -34,6 +38,12 @@ class BillingBloc extends Bloc<BillingEvent, BillingState> {
   final GetSalesReportUseCase getSalesReportUseCase;
   final GetPaymentReportUseCase getPaymentReportUseCase;
 
+  // Inventory management use cases
+  final ReduceStockForInvoiceUseCase reduceStockForInvoiceUseCase;
+  final RestoreStockForCancelledInvoiceUseCase
+  restoreStockForCancelledInvoiceUseCase;
+  final CheckStockAvailabilityUseCase checkStockAvailabilityUseCase;
+
   BillingBloc({
     required this.getAllInvoicesUseCase,
     required this.getInvoiceByIdUseCase,
@@ -45,6 +55,9 @@ class BillingBloc extends Bloc<BillingEvent, BillingState> {
     required this.updateInvoiceUseCase,
     required this.deleteInvoiceUseCase,
     required this.updatePaymentStatusUseCase,
+    required this.updatePartialPaymentUseCase,
+    required this.validateInventoryQuantityUseCase,
+    required this.getAvailableStockUseCase,
     required this.getAllCustomersUseCase,
     required this.getCustomerByIdUseCase,
     required this.searchCustomersUseCase,
@@ -54,6 +67,9 @@ class BillingBloc extends Bloc<BillingEvent, BillingState> {
     required this.getBillingDashboardStatsUseCase,
     required this.getSalesReportUseCase,
     required this.getPaymentReportUseCase,
+    required this.reduceStockForInvoiceUseCase,
+    required this.restoreStockForCancelledInvoiceUseCase,
+    required this.checkStockAvailabilityUseCase,
   }) : super(BillingInitial()) {
     // Invoice events
     on<LoadAllInvoices>(_onLoadAllInvoices);
@@ -66,6 +82,9 @@ class BillingBloc extends Bloc<BillingEvent, BillingState> {
     on<UpdateInvoice>(_onUpdateInvoice);
     on<DeleteInvoice>(_onDeleteInvoice);
     on<UpdatePaymentStatus>(_onUpdatePaymentStatus);
+    on<UpdatePartialPayment>(_onUpdatePartialPayment);
+    on<ValidateInventory>(_onValidateInventory);
+    on<GetAvailableStock>(_onGetAvailableStock);
 
     // Customer events
     on<LoadAllCustomers>(_onLoadAllCustomers);
@@ -177,7 +196,35 @@ class BillingBloc extends Bloc<BillingEvent, BillingState> {
   ) async {
     emit(BillingLoading());
     try {
+      // First, check stock availability for all items
+      final itemQuantities = <int, int>{};
+      for (final item in event.invoice.items) {
+        final itemId = item.itemId;
+        final requiredQuantity = item.quantity.toBigInt().toInt();
+
+        // Add to the map (handle multiple entries of same item)
+        itemQuantities[itemId] =
+            (itemQuantities[itemId] ?? 0) + requiredQuantity;
+      }
+
+      // Check stock availability for all items
+      for (final entry in itemQuantities.entries) {
+        final isAvailable = await checkStockAvailabilityUseCase(
+          entry.key,
+          entry.value,
+        );
+        if (!isAvailable) {
+          emit(const BillingError('Insufficient stock for one or more items'));
+          return;
+        }
+      }
+
+      // Create the invoice
       final invoice = await createInvoiceUseCase(event.invoice);
+
+      // Reduce stock for all items
+      await reduceStockForInvoiceUseCase(itemQuantities, invoice.id!);
+
       emit(InvoiceCreated(invoice));
       add(LoadAllInvoices());
     } catch (e) {
@@ -205,7 +252,26 @@ class BillingBloc extends Bloc<BillingEvent, BillingState> {
   ) async {
     emit(BillingLoading());
     try {
-      await deleteInvoiceUseCase(event.id);
+      // Get invoice details before deleting to restore stock
+      final invoice = await getInvoiceByIdUseCase(event.id);
+      if (invoice != null) {
+        // Prepare item quantities for stock restoration
+        final itemQuantities = <int, int>{};
+        for (final item in invoice.items) {
+          final itemId = item.itemId;
+          final quantity = item.quantity.toBigInt().toInt();
+          itemQuantities[itemId] = (itemQuantities[itemId] ?? 0) + quantity;
+        }
+
+        // Delete the invoice
+        await deleteInvoiceUseCase(event.id);
+
+        // Restore stock for all items
+        await restoreStockForCancelledInvoiceUseCase(itemQuantities, event.id);
+      } else {
+        await deleteInvoiceUseCase(event.id);
+      }
+
       emit(const BillingSuccess('Invoice deleted successfully'));
       add(LoadAllInvoices());
     } catch (e) {
@@ -221,6 +287,51 @@ class BillingBloc extends Bloc<BillingEvent, BillingState> {
       await updatePaymentStatusUseCase(event.invoiceId, event.status);
       emit(const BillingSuccess('Payment status updated successfully'));
       add(LoadAllInvoices());
+    } catch (e) {
+      emit(BillingError(e.toString()));
+    }
+  }
+
+  Future<void> _onUpdatePartialPayment(
+    UpdatePartialPayment event,
+    Emitter<BillingState> emit,
+  ) async {
+    try {
+      await updatePartialPaymentUseCase(
+        event.invoiceId,
+        event.status,
+        event.paidAmount,
+      );
+      emit(const PartialPaymentUpdated('Partial payment updated successfully'));
+      add(LoadAllInvoices());
+    } catch (e) {
+      emit(BillingError(e.toString()));
+    }
+  }
+
+  Future<void> _onValidateInventory(
+    ValidateInventory event,
+    Emitter<BillingState> emit,
+  ) async {
+    try {
+      final isValid = await validateInventoryQuantityUseCase(
+        event.itemId,
+        event.requestedQuantity,
+      );
+      final availableStock = await getAvailableStockUseCase(event.itemId);
+      emit(InventoryValidated(isValid, availableStock));
+    } catch (e) {
+      emit(BillingError(e.toString()));
+    }
+  }
+
+  Future<void> _onGetAvailableStock(
+    GetAvailableStock event,
+    Emitter<BillingState> emit,
+  ) async {
+    try {
+      final stockQuantity = await getAvailableStockUseCase(event.itemId);
+      emit(StockQuantityLoaded(stockQuantity));
     } catch (e) {
       emit(BillingError(e.toString()));
     }

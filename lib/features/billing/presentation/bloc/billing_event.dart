@@ -94,6 +94,36 @@ class UpdatePaymentStatus extends BillingEvent {
   List<Object> get props => [invoiceId, status];
 }
 
+class UpdatePartialPayment extends BillingEvent {
+  final int invoiceId;
+  final String status;
+  final double paidAmount;
+
+  const UpdatePartialPayment(this.invoiceId, this.status, this.paidAmount);
+
+  @override
+  List<Object> get props => [invoiceId, status, paidAmount];
+}
+
+class ValidateInventory extends BillingEvent {
+  final int itemId;
+  final int requestedQuantity;
+
+  const ValidateInventory(this.itemId, this.requestedQuantity);
+
+  @override
+  List<Object> get props => [itemId, requestedQuantity];
+}
+
+class GetAvailableStock extends BillingEvent {
+  final int itemId;
+
+  const GetAvailableStock(this.itemId);
+
+  @override
+  List<Object> get props => [itemId];
+}
+
 // Customer Events
 class LoadAllCustomers extends BillingEvent {}
 

@@ -21,7 +21,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -46,6 +46,24 @@ class DatabaseHelper {
       // Add paid_amount column to invoices table
       await db.execute('''
         ALTER TABLE invoices ADD COLUMN paid_amount REAL DEFAULT 0
+      ''');
+    }
+    if (oldVersion < 4) {
+      // Add inventory_transactions table for tracking stock changes
+      await db.execute('''
+        CREATE TABLE inventory_transactions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          item_id INTEGER NOT NULL,
+          transaction_type TEXT NOT NULL,
+          quantity_change INTEGER NOT NULL,
+          previous_quantity INTEGER NOT NULL,
+          new_quantity INTEGER NOT NULL,
+          invoice_id INTEGER,
+          notes TEXT,
+          created_at TEXT NOT NULL,
+          FOREIGN KEY (item_id) REFERENCES items (id),
+          FOREIGN KEY (invoice_id) REFERENCES invoices (id)
+        )
       ''');
     }
   }
@@ -150,6 +168,23 @@ class DatabaseHelper {
         value TEXT NOT NULL,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
+      )
+    ''');
+
+    // Create Inventory Transactions table
+    await db.execute('''
+      CREATE TABLE inventory_transactions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        item_id INTEGER NOT NULL,
+        transaction_type TEXT NOT NULL,
+        quantity_change INTEGER NOT NULL,
+        previous_quantity INTEGER NOT NULL,
+        new_quantity INTEGER NOT NULL,
+        invoice_id INTEGER,
+        notes TEXT,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (item_id) REFERENCES items (id),
+        FOREIGN KEY (invoice_id) REFERENCES invoices (id)
       )
     ''');
 
