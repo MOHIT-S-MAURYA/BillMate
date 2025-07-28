@@ -1370,15 +1370,18 @@ class _InventoryViewState extends State<InventoryView>
     context.read<InventoryBloc>().add(UpdateStock(itemId, newStock));
   }
 
-  void _addSampleItemsIfEmpty(BuildContext context) {
+  void _addSampleItemsIfEmpty(BuildContext context) async {
     // Add sample items to help users get started
-    DatabaseDebugHelper.addSampleItems()
-        .then((_) {
-          // Reload the items after adding samples
+    try {
+      await DatabaseDebugHelper.addSampleItems();
+      // Reload the items after adding samples
+      if (mounted) {
+        if (context.mounted) {
           context.read<InventoryBloc>().add(LoadAllItems());
-        })
-        .catchError((error) {
-          debugPrint('Error adding sample items: $error');
-        });
+        }
+      }
+    } catch (error) {
+      debugPrint('Error adding sample items: $error');
+    }
   }
 }

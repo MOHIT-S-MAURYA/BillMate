@@ -79,7 +79,8 @@ class _SmartDeletableItemState extends State<SmartDeletableItem> {
         gradient: LinearGradient(
           colors: [
             Colors.transparent,
-            widget.deleteColor?.withOpacity(0.8) ?? Colors.red.withOpacity(0.8),
+            widget.deleteColor?.withValues(alpha: 0.8) ??
+                Colors.red.withValues(alpha: 0.8),
           ],
           begin: Alignment.centerLeft,
           end: Alignment.centerRight,
@@ -104,12 +105,12 @@ class _SmartDeletableItemState extends State<SmartDeletableItem> {
     );
   }
 
-  void _showContextMenu(BuildContext context) {
+  void _showContextMenu(BuildContext context) async {
     final RenderBox renderBox = context.findRenderObject() as RenderBox;
     final position = renderBox.localToGlobal(Offset.zero);
     final size = renderBox.size;
 
-    showMenu(
+    final value = await showMenu(
       context: context,
       position: RelativeRect.fromLTRB(
         position.dx,
@@ -142,17 +143,20 @@ class _SmartDeletableItemState extends State<SmartDeletableItem> {
             ),
           ),
       ],
-    ).then((value) {
-      if (value == 'edit' && widget.onEdit != null) {
-        widget.onEdit!();
-      } else if (value == 'delete' && widget.onDelete != null) {
-        _showDeleteConfirmation(context).then((confirmed) {
-          if (confirmed == true) {
-            widget.onDelete!();
-          }
-        });
+    );
+
+    if (!mounted) return;
+
+    if (value == 'edit' && widget.onEdit != null) {
+      widget.onEdit!();
+    } else if (value == 'delete' && widget.onDelete != null) {
+      // Use mounted check as a guard for the context usage
+      if (!mounted || !context.mounted) return;
+      final confirmed = await _showDeleteConfirmation(context);
+      if (mounted && confirmed == true) {
+        widget.onDelete!();
       }
-    });
+    }
   }
 
   Future<bool?> _showDeleteConfirmation(BuildContext context) {
@@ -259,7 +263,7 @@ class _SmartSelectionModeState extends State<SmartSelectionMode> {
             },
             child: child,
           );
-        }).toList(),
+        }),
       ],
     );
   }
@@ -268,7 +272,7 @@ class _SmartSelectionModeState extends State<SmartSelectionMode> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(0.1),
+        color: AppColors.primary.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
@@ -343,7 +347,7 @@ class _SmartSelectionModeState extends State<SmartSelectionMode> {
       },
       child: Container(
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary.withOpacity(0.1) : null,
+          color: isSelected ? AppColors.primary.withValues(alpha: 0.1) : null,
           border:
               isSelected
                   ? Border.all(color: AppColors.primary, width: 2)
@@ -480,7 +484,7 @@ class _SmartActionButtonState extends State<SmartActionButton>
                       child: FloatingActionButton(
                         mini: true,
                         heroTag:
-                            "smart_action_${widget.actions.indexOf(action)}_${hashCode}",
+                            "smart_action_${widget.actions.indexOf(action)}_$hashCode",
                         backgroundColor: action.backgroundColor,
                         onPressed: () {
                           _toggleExpanded();
@@ -494,12 +498,12 @@ class _SmartActionButtonState extends State<SmartActionButton>
               );
             },
           );
-        }).toList(),
+        }),
 
         // Main FAB
         FloatingActionButton(
           mini: widget.mini,
-          heroTag: "smart_main_fab_${hashCode}",
+          heroTag: "smart_main_fab_$hashCode",
           backgroundColor: widget.backgroundColor ?? AppColors.primary,
           onPressed: _toggleExpanded,
           child: AnimatedRotation(

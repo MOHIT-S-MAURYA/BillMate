@@ -1,21 +1,22 @@
-import 'package:billmate/core/database/database_helper.dart';
+import 'package:flutter/foundation.dart';
+import '../database/database_helper.dart';
 
 class DatabaseDebugHelper {
-  static Future<void> checkItemsTable() async {
+  static Future<void> printDatabaseStatus() async {
     try {
       final db = await DatabaseHelper().database;
 
-      // Check if items table exists and get count
+      // Check how many items are in the database
       final itemCount = await db.rawQuery(
         'SELECT COUNT(*) as count FROM items WHERE is_active = 1',
       );
       final count = itemCount.first['count'] as int;
 
-      print('📊 Items in database: $count');
+      debugPrint('📊 Items in database: $count');
 
       if (count == 0) {
-        print('⚠️ No items found! Database is empty.');
-        print('🔧 Consider adding sample items.');
+        debugPrint('⚠️ No items found! Database is empty.');
+        debugPrint('🔧 Consider adding sample items.');
       } else {
         // Get all items
         final items = await db.query(
@@ -23,15 +24,15 @@ class DatabaseDebugHelper {
           where: 'is_active = ?',
           whereArgs: [1],
         );
-        print('📦 Items found:');
+        debugPrint('📦 Items found:');
         for (final item in items) {
-          print(
+          debugPrint(
             '  - ${item['name']} (ID: ${item['id']}, Stock: ${item['stock_quantity']})',
           );
         }
       }
     } catch (e) {
-      print('❌ Database error: $e');
+      debugPrint('❌ Database error: $e');
     }
   }
 
@@ -43,7 +44,7 @@ class DatabaseDebugHelper {
       // Check if items already exist
       final existing = await db.query('items', limit: 1);
       if (existing.isNotEmpty) {
-        print('✅ Items already exist in database');
+        debugPrint('✅ Items already exist in database');
         return;
       }
 
@@ -124,9 +125,9 @@ class DatabaseDebugHelper {
         await db.insert('items', item);
       }
 
-      print('✅ Added ${sampleItems.length} sample items to database');
+      debugPrint('✅ Added ${sampleItems.length} sample items to database');
     } catch (e) {
-      print('❌ Error adding sample items: $e');
+      debugPrint('❌ Error adding sample items: $e');
     }
   }
 }

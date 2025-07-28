@@ -77,7 +77,7 @@ class _InvoiceDetailViewState extends State<InvoiceDetailView> {
       ),
     ).then((result) {
       // Refresh the invoice data when returning from payment management
-      if (_currentInvoice.id != null) {
+      if (mounted && _currentInvoice.id != null) {
         context.read<BillingBloc>().add(
           LoadPaymentHistoryByInvoice(_currentInvoice.id!),
         );
