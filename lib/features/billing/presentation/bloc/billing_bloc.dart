@@ -402,7 +402,7 @@ class BillingBloc extends Bloc<BillingEvent, BillingState> {
     emit(BillingLoading());
     try {
       await updateCustomerUseCase(event.customer);
-      emit(const BillingSuccess('Customer updated successfully'));
+      emit(CustomerUpdated(event.customer));
       add(LoadAllCustomers());
     } catch (e) {
       emit(BillingError(e.toString()));

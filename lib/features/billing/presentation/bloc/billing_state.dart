@@ -90,6 +90,15 @@ class CustomerCreated extends BillingState {
   List<Object> get props => [customer];
 }
 
+class CustomerUpdated extends BillingState {
+  final Customer customer;
+
+  const CustomerUpdated(this.customer);
+
+  @override
+  List<Object> get props => [customer];
+}
+
 // Analytics States
 class BillingDashboardStatsLoaded extends BillingState {
   final Map<String, dynamic> stats;

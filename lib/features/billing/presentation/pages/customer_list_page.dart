@@ -4,6 +4,8 @@ import 'package:billmate/shared/constants/app_colors.dart';
 import 'package:billmate/features/billing/presentation/bloc/billing_bloc.dart';
 import 'package:billmate/features/billing/domain/entities/customer.dart';
 import 'package:billmate/core/di/injection_container.dart';
+import 'package:billmate/features/billing/presentation/widgets/add_customer_dialog.dart';
+import 'package:billmate/core/navigation/modern_navigation_widgets.dart';
 
 class CustomerListPage extends StatelessWidget {
   const CustomerListPage({super.key});
@@ -203,16 +205,24 @@ class _CustomerListViewState extends State<CustomerListView> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: ModernFloatingActionButtonExtended(
         heroTag: "addCustomerFAB",
         onPressed: () {
-          // TODO: Implement CreateCustomerPage
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Add Customer feature coming soon!')),
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder:
+                (dialogContext) => BlocProvider.value(
+                  value: context.read<BillingBloc>(),
+                  child: AddCustomerDialog(
+                    onCustomerAdded: (customer) {
+                      // Refresh the customer list
+                      context.read<BillingBloc>().add(LoadAllCustomers());
+                    },
+                  ),
+                ),
           );
         },
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
         icon: const Icon(Icons.person_add),
         label: const Text('Add Customer'),
       ),

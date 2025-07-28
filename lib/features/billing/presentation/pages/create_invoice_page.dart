@@ -5,12 +5,14 @@ import 'package:decimal/decimal.dart';
 import 'package:billmate/shared/constants/app_colors.dart';
 import 'package:billmate/features/billing/presentation/bloc/billing_bloc.dart';
 import 'package:billmate/features/billing/domain/entities/invoice.dart';
+import 'package:billmate/features/billing/domain/entities/customer.dart';
 import 'package:billmate/features/inventory/domain/entities/item.dart';
 import 'package:billmate/features/inventory/presentation/bloc/inventory_bloc.dart';
 import 'package:billmate/features/billing/services/pdf_service.dart';
 import 'package:billmate/core/di/injection_container.dart';
 import 'package:billmate/core/navigation/modern_navigation_widgets.dart';
 import 'package:billmate/core/navigation/navigation_service.dart';
+import 'package:billmate/features/billing/presentation/widgets/smart_customer_search_field.dart';
 
 class CreateInvoicePage extends StatelessWidget {
   const CreateInvoicePage({super.key});
@@ -39,8 +41,11 @@ class CreateInvoiceView extends StatefulWidget {
 class _CreateInvoiceViewState extends State<CreateInvoiceView> {
   final _formKey = GlobalKey<FormState>();
   final _notesController = TextEditingController();
-  final _customerNameController = TextEditingController();
-  final _customerEmailController = TextEditingController();
+
+  // Customer related fields
+  Customer? _selectedCustomer;
+  String _customerName = '';
+  String _customerEmail = '';
 
   DateTime _invoiceDate = DateTime.now();
   DateTime? _dueDate;
@@ -90,8 +95,6 @@ class _CreateInvoiceViewState extends State<CreateInvoiceView> {
   @override
   void dispose() {
     _notesController.dispose();
-    _customerNameController.dispose();
-    _customerEmailController.dispose();
     super.dispose();
   }
 
@@ -275,10 +278,9 @@ class _CreateInvoiceViewState extends State<CreateInvoiceView> {
 
   void _saveInvoice() {
     if (_formKey.currentState!.validate()) {
-      if (_customerNameController.text.trim().isEmpty &&
-          _customerEmailController.text.trim().isEmpty) {
+      if (_customerName.trim().isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please enter customer name or email')),
+          const SnackBar(content: Text('Please enter customer name')),
         );
         return;
       }
@@ -292,7 +294,8 @@ class _CreateInvoiceViewState extends State<CreateInvoiceView> {
 
       final invoice = Invoice(
         invoiceNumber: 'INV-${DateTime.now().millisecondsSinceEpoch}',
-        customerId: null, // No customer ID for temporary customers
+        customerId:
+            _selectedCustomer?.id, // Use existing customer ID if selected
         invoiceDate: _invoiceDate,
         dueDate: _dueDate,
         subtotal: _subtotal,
@@ -320,10 +323,9 @@ class _CreateInvoiceViewState extends State<CreateInvoiceView> {
 
   void _previewAndPrint() {
     if (_formKey.currentState!.validate()) {
-      if (_customerNameController.text.trim().isEmpty &&
-          _customerEmailController.text.trim().isEmpty) {
+      if (_customerName.trim().isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please enter customer name or email')),
+          const SnackBar(content: Text('Please enter customer name')),
         );
         return;
       }
@@ -363,13 +365,9 @@ class _CreateInvoiceViewState extends State<CreateInvoiceView> {
       PdfService.generateAndPrintInvoice(
         invoice,
         customerName:
-            _customerNameController.text.trim().isEmpty
-                ? null
-                : _customerNameController.text.trim(),
+            _customerName.trim().isEmpty ? null : _customerName.trim(),
         customerEmail:
-            _customerEmailController.text.trim().isEmpty
-                ? null
-                : _customerEmailController.text.trim(),
+            _customerEmail.trim().isEmpty ? null : _customerEmail.trim(),
       );
     }
   }
@@ -473,60 +471,98 @@ class _CreateInvoiceViewState extends State<CreateInvoiceView> {
               ),
             ),
             const SizedBox(height: 16),
-            TextFormField(
-              controller: _customerNameController,
-              decoration: const InputDecoration(
-                labelText: 'Customer Name',
-                border: OutlineInputBorder(),
-                hintText: 'Enter customer name',
-              ),
-              validator: (value) {
-                // At least one of name or email must be provided
-                if ((value == null || value.trim().isEmpty) &&
-                    _customerEmailController.text.trim().isEmpty) {
-                  return 'Please enter customer name or email';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _customerEmailController,
-              decoration: const InputDecoration(
-                labelText: 'Customer Email',
-                border: OutlineInputBorder(),
-                hintText: 'Enter customer email',
-              ),
-              keyboardType: TextInputType.emailAddress,
-              validator: (value) {
-                // If email is provided, validate its format
-                if (value != null && value.trim().isNotEmpty) {
-                  final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
-                  if (!emailRegex.hasMatch(value.trim())) {
-                    return 'Please enter a valid email address';
+            SmartCustomerSearchField(
+              labelText: 'Customer Name *',
+              hintText: 'Search existing customer or enter new name...',
+              initialCustomer: _selectedCustomer,
+              required: true,
+              onCustomerSelected: (customer) {
+                setState(() {
+                  _selectedCustomer = customer;
+                  if (customer != null) {
+                    _customerName = customer.name;
+                    _customerEmail = customer.email ?? '';
                   }
-                }
-                return null;
+                });
+              },
+              onTextChanged: (text) {
+                setState(() {
+                  _customerName = text;
+                  if (_selectedCustomer == null ||
+                      _selectedCustomer!.name != text) {
+                    _selectedCustomer = null;
+                    _customerEmail = '';
+                  }
+                });
               },
             ),
+            if (_selectedCustomer == null && _customerName.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              TextFormField(
+                decoration: const InputDecoration(
+                  labelText: 'Customer Email (Optional)',
+                  border: OutlineInputBorder(),
+                  hintText: 'Enter customer email',
+                  prefixIcon: Icon(Icons.email),
+                ),
+                keyboardType: TextInputType.emailAddress,
+                onChanged: (value) {
+                  setState(() {
+                    _customerEmail = value;
+                  });
+                },
+                validator: (value) {
+                  if (value != null && value.trim().isNotEmpty) {
+                    final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
+                    if (!emailRegex.hasMatch(value.trim())) {
+                      return 'Please enter a valid email address';
+                    }
+                  }
+                  return null;
+                },
+              ),
+            ],
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
+                color:
+                    _selectedCustomer != null
+                        ? AppColors.success.withValues(alpha: 0.1)
+                        : AppColors.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: AppColors.primary.withValues(alpha: 0.3),
+                  color:
+                      _selectedCustomer != null
+                          ? AppColors.success.withValues(alpha: 0.3)
+                          : AppColors.primary.withValues(alpha: 0.3),
                 ),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.info_outline, color: AppColors.primary, size: 16),
+                  Icon(
+                    _selectedCustomer != null
+                        ? Icons.check_circle
+                        : Icons.info_outline,
+                    color:
+                        _selectedCustomer != null
+                            ? AppColors.success
+                            : AppColors.primary,
+                    size: 16,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Customer details are only for this invoice and will not be saved permanently.',
-                      style: TextStyle(color: AppColors.primary, fontSize: 12),
+                      _selectedCustomer != null
+                          ? 'Using existing customer: ${_selectedCustomer!.name}${_selectedCustomer!.email != null ? ' (${_selectedCustomer!.email})' : ''}'
+                          : 'New customer details for this invoice only. Create a customer profile to save permanently.',
+                      style: TextStyle(
+                        color:
+                            _selectedCustomer != null
+                                ? AppColors.success
+                                : AppColors.primary,
+                        fontSize: 12,
+                      ),
                     ),
                   ),
                 ],
