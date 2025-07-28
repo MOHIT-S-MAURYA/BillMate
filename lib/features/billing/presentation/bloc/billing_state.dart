@@ -156,3 +156,22 @@ class PartialPaymentUpdated extends BillingState {
   @override
   List<Object> get props => [message];
 }
+
+// Payment History States
+class PaymentHistoryCreated extends BillingState {
+  final PaymentHistory paymentHistory;
+
+  const PaymentHistoryCreated(this.paymentHistory);
+
+  @override
+  List<Object> get props => [paymentHistory];
+}
+
+class PaymentHistoryLoaded extends BillingState {
+  final List<PaymentHistory> paymentHistory;
+
+  const PaymentHistoryLoaded(this.paymentHistory);
+
+  @override
+  List<Object> get props => [paymentHistory];
+}

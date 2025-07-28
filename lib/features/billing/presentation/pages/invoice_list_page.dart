@@ -7,6 +7,7 @@ import 'package:billmate/features/billing/domain/entities/invoice.dart';
 import 'package:billmate/core/di/injection_container.dart';
 import 'package:billmate/features/billing/presentation/pages/create_invoice_page.dart';
 import 'package:billmate/features/billing/presentation/pages/invoice_detail_page.dart';
+import 'package:billmate/core/widgets/smart_deletion_widgets.dart';
 
 class InvoiceListPage extends StatelessWidget {
   final String? initialFilter;
@@ -351,117 +352,140 @@ class _InvoiceListViewState extends State<InvoiceListView> {
     final formatter = NumberFormat.currency(symbol: '₹');
     final dateFormatter = DateFormat('MMM dd, yyyy');
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      color: AppColors.cardBackground,
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: InkWell(
-        onTap: () async {
-          final bloc = context.read<BillingBloc>();
-          await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => InvoiceDetailPage(invoice: invoice),
-            ),
-          );
-          // Refresh the list when returning from detail page
-          if (mounted) {
-            bloc.add(LoadAllInvoices());
-          }
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header row
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    invoice.invoiceNumber,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _getStatusColor(
-                        invoice.paymentStatus,
-                      ).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      invoice.paymentStatus.toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 12,
+    return SmartDeletableItem(
+      canDelete: true,
+      canEdit: false,
+      deleteConfirmationTitle: 'Delete Invoice',
+      deleteConfirmationMessage:
+          'Are you sure you want to delete invoice ${invoice.invoiceNumber}? This action cannot be undone and will permanently remove all associated data including payment history.',
+      onDelete: () => _deleteInvoice(invoice),
+      child: Card(
+        margin: const EdgeInsets.only(bottom: 12),
+        color: AppColors.cardBackground,
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: InkWell(
+          onTap: () async {
+            final bloc = context.read<BillingBloc>();
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => InvoiceDetailPage(invoice: invoice),
+              ),
+            );
+            // Refresh the list when returning from detail page
+            if (mounted) {
+              bloc.add(LoadAllInvoices());
+            }
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header row
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      invoice.invoiceNumber,
+                      style: const TextStyle(
+                        fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: _getStatusColor(invoice.paymentStatus),
+                        color: AppColors.textPrimary,
                       ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-
-              // Customer name (if available)
-              if (invoice.customerId != null) ...[
-                Text(
-                  'Customer ID: ${invoice.customerId}',
-                  style: const TextStyle(
-                    color: AppColors.textHint,
-                    fontSize: 14,
-                  ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _getStatusColor(
+                          invoice.paymentStatus,
+                        ).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        invoice.paymentStatus.toUpperCase(),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: _getStatusColor(invoice.paymentStatus),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 4),
-              ],
+                const SizedBox(height: 8),
 
-              // Date and amount row
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
+                // Customer name (if available)
+                if (invoice.customerId != null) ...[
                   Text(
-                    dateFormatter.format(invoice.invoiceDate),
+                    'Customer ID: ${invoice.customerId}',
                     style: const TextStyle(
                       color: AppColors.textHint,
                       fontSize: 14,
                     ),
                   ),
-                  Text(
-                    formatter.format(invoice.totalAmount.toDouble()),
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primary,
+                  const SizedBox(height: 4),
+                ],
+
+                // Date and amount row
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      dateFormatter.format(invoice.invoiceDate),
+                      style: const TextStyle(
+                        color: AppColors.textHint,
+                        fontSize: 14,
+                      ),
                     ),
+                    Text(
+                      formatter.format(invoice.totalAmount.toDouble()),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ],
+                ),
+
+                // Notes (if available)
+                if (invoice.notes != null && invoice.notes!.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    invoice.notes!,
+                    style: const TextStyle(
+                      color: AppColors.textHint,
+                      fontSize: 12,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
-              ),
-
-              // Notes (if available)
-              if (invoice.notes != null && invoice.notes!.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Text(
-                  invoice.notes!,
-                  style: const TextStyle(
-                    color: AppColors.textHint,
-                    fontSize: 12,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
               ],
-            ],
+            ),
           ),
         ),
+      ),
+    );
+  }
+
+  // Smart deletion method for invoices
+  void _deleteInvoice(Invoice invoice) {
+    context.read<BillingBloc>().add(DeleteInvoice(invoice.id!));
+
+    // Reload invoices after deletion
+    context.read<BillingBloc>().add(LoadAllInvoices());
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Invoice ${invoice.invoiceNumber} deleted successfully!'),
+        backgroundColor: Colors.green,
       ),
     );
   }

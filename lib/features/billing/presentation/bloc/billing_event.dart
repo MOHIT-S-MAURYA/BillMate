@@ -194,3 +194,33 @@ class LoadSalesReport extends BillingEvent {
 }
 
 class LoadPaymentReport extends BillingEvent {}
+
+// Payment History Events
+class CreatePaymentHistory extends BillingEvent {
+  final PaymentHistory paymentHistory;
+
+  const CreatePaymentHistory(this.paymentHistory);
+
+  @override
+  List<Object> get props => [paymentHistory];
+}
+
+class LoadPaymentHistoryByInvoice extends BillingEvent {
+  final int invoiceId;
+
+  const LoadPaymentHistoryByInvoice(this.invoiceId);
+
+  @override
+  List<Object> get props => [invoiceId];
+}
+
+class LoadAllPaymentHistory extends BillingEvent {}
+
+class DeletePaymentHistory extends BillingEvent {
+  final int id;
+
+  const DeletePaymentHistory(this.id);
+
+  @override
+  List<Object> get props => [id];
+}

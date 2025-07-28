@@ -1,10 +1,13 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
+import 'package:decimal/decimal.dart';
 import 'package:billmate/features/billing/domain/entities/invoice.dart';
 import 'package:billmate/features/billing/domain/entities/customer.dart';
+import 'package:billmate/features/billing/domain/entities/payment_history.dart';
 import 'package:billmate/features/billing/domain/usecases/invoice_usecases.dart';
 import 'package:billmate/features/billing/domain/usecases/customer_usecases.dart';
 import 'package:billmate/features/billing/domain/usecases/analytics_usecases.dart';
+import 'package:billmate/features/billing/domain/usecases/payment_history_usecases.dart';
 import 'package:billmate/features/inventory/domain/usecases/inventory_management_usecases.dart';
 import 'package:injectable/injectable.dart';
 
@@ -38,6 +41,12 @@ class BillingBloc extends Bloc<BillingEvent, BillingState> {
   final GetSalesReportUseCase getSalesReportUseCase;
   final GetPaymentReportUseCase getPaymentReportUseCase;
 
+  // Payment history use cases
+  final CreatePaymentHistoryUseCase createPaymentHistoryUseCase;
+  final GetPaymentHistoryByInvoiceUseCase getPaymentHistoryByInvoiceUseCase;
+  final GetAllPaymentHistoryUseCase getAllPaymentHistoryUseCase;
+  final DeletePaymentHistoryUseCase deletePaymentHistoryUseCase;
+
   // Inventory management use cases
   final ReduceStockForInvoiceUseCase reduceStockForInvoiceUseCase;
   final RestoreStockForCancelledInvoiceUseCase
@@ -67,6 +76,10 @@ class BillingBloc extends Bloc<BillingEvent, BillingState> {
     required this.getBillingDashboardStatsUseCase,
     required this.getSalesReportUseCase,
     required this.getPaymentReportUseCase,
+    required this.createPaymentHistoryUseCase,
+    required this.getPaymentHistoryByInvoiceUseCase,
+    required this.getAllPaymentHistoryUseCase,
+    required this.deletePaymentHistoryUseCase,
     required this.reduceStockForInvoiceUseCase,
     required this.restoreStockForCancelledInvoiceUseCase,
     required this.checkStockAvailabilityUseCase,
@@ -98,6 +111,12 @@ class BillingBloc extends Bloc<BillingEvent, BillingState> {
     on<LoadBillingDashboardStats>(_onLoadBillingDashboardStats);
     on<LoadSalesReport>(_onLoadSalesReport);
     on<LoadPaymentReport>(_onLoadPaymentReport);
+
+    // Payment history events
+    on<CreatePaymentHistory>(_onCreatePaymentHistory);
+    on<LoadPaymentHistoryByInvoice>(_onLoadPaymentHistoryByInvoice);
+    on<LoadAllPaymentHistory>(_onLoadAllPaymentHistory);
+    on<DeletePaymentHistory>(_onDeletePaymentHistory);
   }
 
   // Invoice event handlers
@@ -224,6 +243,26 @@ class BillingBloc extends Bloc<BillingEvent, BillingState> {
 
       // Reduce stock for all items
       await reduceStockForInvoiceUseCase(itemQuantities, invoice.id!);
+
+      // Create payment history record if there's an initial payment
+      if (event.invoice.paidAmount != null &&
+          event.invoice.paidAmount! > Decimal.zero) {
+        final paymentHistory = PaymentHistory(
+          invoiceId: invoice.id!,
+          paymentAmount: event.invoice.paidAmount!,
+          paymentMethod: event.invoice.paymentMethod,
+          paymentDate: event.invoice.paymentDate ?? DateTime.now(),
+          paymentReference: null, // Could be enhanced to include reference
+          notes:
+              event.invoice.paymentStatus == 'paid'
+                  ? 'Full payment at time of purchase'
+                  : 'Partial payment at time of purchase',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+
+        await createPaymentHistoryUseCase(paymentHistory);
+      }
 
       emit(InvoiceCreated(invoice));
       add(LoadAllInvoices());
@@ -461,6 +500,99 @@ class BillingBloc extends Bloc<BillingEvent, BillingState> {
     try {
       final report = await getPaymentReportUseCase();
       emit(PaymentReportLoaded(report));
+    } catch (e) {
+      emit(BillingError(e.toString()));
+    }
+  }
+
+  // Payment history event handlers
+  Future<void> _onCreatePaymentHistory(
+    CreatePaymentHistory event,
+    Emitter<BillingState> emit,
+  ) async {
+    try {
+      final createdPaymentHistory = await createPaymentHistoryUseCase(
+        event.paymentHistory,
+      );
+      emit(PaymentHistoryCreated(createdPaymentHistory));
+
+      // Load all payment history for this invoice to calculate total paid
+      final allPayments = await getPaymentHistoryByInvoiceUseCase(
+        event.paymentHistory.invoiceId,
+      );
+
+      // Calculate total paid amount
+      final totalPaidAmount = allPayments.fold<Decimal>(
+        Decimal.zero,
+        (sum, payment) => sum + payment.paymentAmount,
+      );
+
+      // Get the current invoice to check total amount
+      final invoice = await getInvoiceByIdUseCase(
+        event.paymentHistory.invoiceId,
+      );
+      if (invoice != null) {
+        // Determine payment status based on total paid vs total amount
+        String newPaymentStatus;
+        if (totalPaidAmount >= invoice.totalAmount) {
+          newPaymentStatus = 'paid';
+        } else if (totalPaidAmount > Decimal.zero) {
+          newPaymentStatus = 'partial';
+        } else {
+          newPaymentStatus = 'pending';
+        }
+
+        // Update payment status if it has changed
+        if (invoice.paymentStatus != newPaymentStatus) {
+          await updatePaymentStatusUseCase(invoice.id!, newPaymentStatus);
+
+          // Reload invoices to reflect the updated status
+          add(LoadAllInvoices());
+        }
+      }
+
+      add(LoadPaymentHistoryByInvoice(event.paymentHistory.invoiceId));
+    } catch (e) {
+      emit(BillingError(e.toString()));
+    }
+  }
+
+  Future<void> _onLoadPaymentHistoryByInvoice(
+    LoadPaymentHistoryByInvoice event,
+    Emitter<BillingState> emit,
+  ) async {
+    emit(BillingLoading());
+    try {
+      final paymentHistory = await getPaymentHistoryByInvoiceUseCase(
+        event.invoiceId,
+      );
+      emit(PaymentHistoryLoaded(paymentHistory));
+    } catch (e) {
+      emit(BillingError(e.toString()));
+    }
+  }
+
+  Future<void> _onLoadAllPaymentHistory(
+    LoadAllPaymentHistory event,
+    Emitter<BillingState> emit,
+  ) async {
+    emit(BillingLoading());
+    try {
+      final paymentHistory = await getAllPaymentHistoryUseCase();
+      emit(PaymentHistoryLoaded(paymentHistory));
+    } catch (e) {
+      emit(BillingError(e.toString()));
+    }
+  }
+
+  Future<void> _onDeletePaymentHistory(
+    DeletePaymentHistory event,
+    Emitter<BillingState> emit,
+  ) async {
+    try {
+      await deletePaymentHistoryUseCase(event.id);
+      emit(const BillingSuccess('Payment history deleted successfully'));
+      add(LoadAllPaymentHistory());
     } catch (e) {
       emit(BillingError(e.toString()));
     }

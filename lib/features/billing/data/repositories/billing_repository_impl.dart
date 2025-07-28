@@ -1,9 +1,11 @@
 import 'package:billmate/features/billing/domain/entities/invoice.dart';
 import 'package:billmate/features/billing/domain/entities/customer.dart';
+import 'package:billmate/features/billing/domain/entities/payment_history.dart';
 import 'package:billmate/features/billing/domain/repositories/billing_repository.dart';
 import 'package:billmate/features/billing/data/datasources/billing_local_datasource.dart';
 import 'package:billmate/features/billing/data/models/invoice_model.dart';
 import 'package:billmate/features/billing/data/models/customer_model.dart';
+import 'package:billmate/features/billing/data/models/payment_history_model.dart';
 import 'package:injectable/injectable.dart';
 
 @Injectable(as: BillingRepository)
@@ -259,6 +261,54 @@ class BillingRepositoryImpl implements BillingRepository {
       return await localDataSource.getPaymentReport();
     } catch (e) {
       throw Exception('Failed to get payment report: $e');
+    }
+  }
+
+  // Payment history operations
+  @override
+  Future<PaymentHistory> createPaymentHistory(
+    PaymentHistory paymentHistory,
+  ) async {
+    try {
+      final paymentHistoryModel = PaymentHistoryModel.fromDomain(
+        paymentHistory,
+      );
+      final id = await localDataSource.createPaymentHistory(
+        paymentHistoryModel,
+      );
+      return paymentHistory.copyWith(id: id);
+    } catch (e) {
+      throw Exception('Failed to create payment history: $e');
+    }
+  }
+
+  @override
+  Future<List<PaymentHistory>> getPaymentHistoryByInvoice(int invoiceId) async {
+    try {
+      final paymentHistoryModels = await localDataSource
+          .getPaymentHistoryByInvoice(invoiceId);
+      return paymentHistoryModels.map((model) => model.toDomain()).toList();
+    } catch (e) {
+      throw Exception('Failed to get payment history by invoice: $e');
+    }
+  }
+
+  @override
+  Future<List<PaymentHistory>> getAllPaymentHistory() async {
+    try {
+      final paymentHistoryModels = await localDataSource.getAllPaymentHistory();
+      return paymentHistoryModels.map((model) => model.toDomain()).toList();
+    } catch (e) {
+      throw Exception('Failed to get all payment history: $e');
+    }
+  }
+
+  @override
+  Future<void> deletePaymentHistory(int id) async {
+    try {
+      await localDataSource.deletePaymentHistory(id);
+    } catch (e) {
+      throw Exception('Failed to delete payment history: $e');
     }
   }
 }

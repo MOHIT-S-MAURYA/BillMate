@@ -21,7 +21,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 4,
+      version: 5,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -63,6 +63,23 @@ class DatabaseHelper {
           created_at TEXT NOT NULL,
           FOREIGN KEY (item_id) REFERENCES items (id),
           FOREIGN KEY (invoice_id) REFERENCES invoices (id)
+        )
+      ''');
+    }
+    if (oldVersion < 5) {
+      // Add payment_history table for tracking partial payments
+      await db.execute('''
+        CREATE TABLE payment_history (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          invoice_id INTEGER NOT NULL,
+          payment_amount REAL NOT NULL,
+          payment_method TEXT NOT NULL,
+          payment_date TEXT NOT NULL,
+          payment_reference TEXT,
+          notes TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (invoice_id) REFERENCES invoices (id) ON DELETE CASCADE
         )
       ''');
     }
@@ -185,6 +202,22 @@ class DatabaseHelper {
         created_at TEXT NOT NULL,
         FOREIGN KEY (item_id) REFERENCES items (id),
         FOREIGN KEY (invoice_id) REFERENCES invoices (id)
+      )
+    ''');
+
+    // Create Payment History table
+    await db.execute('''
+      CREATE TABLE payment_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        invoice_id INTEGER NOT NULL,
+        payment_amount REAL NOT NULL,
+        payment_method TEXT NOT NULL,
+        payment_date TEXT NOT NULL,
+        payment_reference TEXT,
+        notes TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (invoice_id) REFERENCES invoices (id) ON DELETE CASCADE
       )
     ''');
 

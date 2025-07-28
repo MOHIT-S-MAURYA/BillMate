@@ -5,6 +5,7 @@ import 'package:decimal/decimal.dart';
 import 'package:billmate/shared/constants/app_colors.dart';
 import 'package:billmate/features/billing/domain/entities/invoice.dart';
 import 'package:billmate/features/billing/presentation/bloc/billing_bloc.dart';
+import 'package:billmate/features/billing/presentation/pages/payment_management_page.dart';
 import 'package:billmate/features/billing/services/pdf_service.dart';
 import 'package:billmate/core/di/injection_container.dart';
 
@@ -41,6 +42,13 @@ class _InvoiceDetailViewState extends State<InvoiceDetailView> {
     _currentInvoice = widget.invoice;
     _paidAmountController.text =
         (_currentInvoice.paidAmount ?? Decimal.zero).toString();
+
+    // Load payment history for this invoice
+    if (_currentInvoice.id != null) {
+      context.read<BillingBloc>().add(
+        LoadPaymentHistoryByInvoice(_currentInvoice.id!),
+      );
+    }
   }
 
   @override
@@ -61,83 +69,19 @@ class _InvoiceDetailViewState extends State<InvoiceDetailView> {
     }
   }
 
-  void _showPaymentDialog() {
-    final remainingAmount =
-        _currentInvoice.totalAmount -
-        (_currentInvoice.paidAmount ?? Decimal.zero);
-
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Update Payment'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Total Amount: ₹${_currentInvoice.totalAmount.toStringAsFixed(2)}',
-                ),
-                Text(
-                  'Paid Amount: ₹${(_currentInvoice.paidAmount ?? Decimal.zero).toStringAsFixed(2)}',
-                ),
-                Text('Remaining: ₹${remainingAmount.toStringAsFixed(2)}'),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _paidAmountController,
-                  decoration: const InputDecoration(
-                    labelText: 'Enter Payment Amount',
-                    prefixText: '₹ ',
-                  ),
-                  keyboardType: TextInputType.number,
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () => _updatePayment(),
-                child: const Text('Update'),
-              ),
-            ],
-          ),
-    );
-  }
-
-  void _updatePayment() {
-    final paidAmount = Decimal.tryParse(_paidAmountController.text);
-    if (paidAmount == null || paidAmount < Decimal.zero) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a valid amount')),
-      );
-      return;
-    }
-
-    final totalPaid = (_currentInvoice.paidAmount ?? Decimal.zero) + paidAmount;
-    String newStatus;
-
-    if (totalPaid >= _currentInvoice.totalAmount) {
-      newStatus = 'paid';
-    } else if (totalPaid > Decimal.zero) {
-      newStatus = 'partial';
-    } else {
-      newStatus = 'pending';
-    }
-
-    final updatedInvoice = _currentInvoice.copyWith(
-      paidAmount: totalPaid,
-      paymentStatus: newStatus,
-      paymentDate: newStatus != 'pending' ? DateTime.now() : null,
-    );
-
-    context.read<BillingBloc>().add(UpdateInvoice(updatedInvoice));
-    Navigator.pop(context);
-
-    setState(() {
-      _currentInvoice = updatedInvoice;
+  void _openPaymentManagement() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PaymentManagementPage(invoice: _currentInvoice),
+      ),
+    ).then((result) {
+      // Refresh the invoice data when returning from payment management
+      if (_currentInvoice.id != null) {
+        context.read<BillingBloc>().add(
+          LoadPaymentHistoryByInvoice(_currentInvoice.id!),
+        );
+      }
     });
   }
 
@@ -175,12 +119,14 @@ class _InvoiceDetailViewState extends State<InvoiceDetailView> {
             icon: const Icon(Icons.print, color: AppColors.primary),
             tooltip: 'Print Invoice',
           ),
-          if (_currentInvoice.paymentStatus != 'paid')
-            IconButton(
-              onPressed: _showPaymentDialog,
-              icon: const Icon(Icons.payment, color: AppColors.success),
-              tooltip: 'Update Payment',
+          IconButton(
+            onPressed: _openPaymentManagement,
+            icon: const Icon(
+              Icons.account_balance_wallet,
+              color: AppColors.success,
             ),
+            tooltip: 'Manage Payments',
+          ),
         ],
       ),
       body: BlocListener<BillingBloc, BillingState>(
@@ -461,6 +407,47 @@ class _InvoiceDetailViewState extends State<InvoiceDetailView> {
                   ],
                 ),
               ),
+
+              // Payment History Section
+              if (_currentInvoice.paymentStatus != 'pending') ...[
+                const SizedBox(height: 20),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.1),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.history, color: AppColors.primary),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Payment History',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      _buildPaymentHistorySection(),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -497,6 +484,174 @@ class _InvoiceDetailViewState extends State<InvoiceDetailView> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildPaymentHistorySection() {
+    return BlocBuilder<BillingBloc, BillingState>(
+      builder: (context, state) {
+        if (state is PaymentHistoryLoaded) {
+          if (state.paymentHistory.isEmpty) {
+            return Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.borderColor),
+              ),
+              child: const Center(
+                child: Text(
+                  'No payment records found',
+                  style: TextStyle(color: AppColors.textHint),
+                ),
+              ),
+            );
+          }
+
+          return Column(
+            children:
+                state.paymentHistory.asMap().entries.map((entry) {
+                  final payment = entry.value;
+                  final isLast = entry.key == state.paymentHistory.length - 1;
+
+                  return Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.background,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.borderColor),
+                        ),
+                        child: Row(
+                          children: [
+                            _getPaymentMethodIcon(payment.paymentMethod),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        '₹${payment.paymentAmount.toStringAsFixed(2)}',
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.textPrimary,
+                                        ),
+                                      ),
+                                      Text(
+                                        DateFormat(
+                                          'dd/MM/yyyy',
+                                        ).format(payment.paymentDate),
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: AppColors.textHint,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        payment.paymentMethod.toUpperCase(),
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                      if (payment.paymentReference != null)
+                                        Text(
+                                          'Ref: ${payment.paymentReference}',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: AppColors.textHint,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  if (payment.notes != null) ...[
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      payment.notes!,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: AppColors.textSecondary,
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (!isLast) const SizedBox(height: 8),
+                    ],
+                  );
+                }).toList(),
+          );
+        } else if (state is BillingLoading) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(20),
+              child: CircularProgressIndicator(),
+            ),
+          );
+        }
+        return const SizedBox.shrink();
+      },
+    );
+  }
+
+  Widget _getPaymentMethodIcon(String method) {
+    IconData iconData;
+    Color color;
+
+    switch (method.toLowerCase()) {
+      case 'cash':
+        iconData = Icons.money;
+        color = AppColors.success;
+        break;
+      case 'card':
+        iconData = Icons.credit_card;
+        color = AppColors.primary;
+        break;
+      case 'upi':
+        iconData = Icons.qr_code;
+        color = AppColors.warning;
+        break;
+      case 'cheque':
+        iconData = Icons.receipt_long;
+        color = AppColors.textSecondary;
+        break;
+      case 'bank_transfer':
+        iconData = Icons.account_balance;
+        color = AppColors.primary;
+        break;
+      case 'digital_wallet':
+        iconData = Icons.wallet;
+        color = AppColors.success;
+        break;
+      default:
+        iconData = Icons.payment;
+        color = AppColors.textHint;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        shape: BoxShape.circle,
+      ),
+      child: Icon(iconData, color: color, size: 20),
     );
   }
 }

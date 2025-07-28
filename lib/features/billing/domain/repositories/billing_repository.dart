@@ -1,5 +1,6 @@
 import 'package:billmate/features/billing/domain/entities/invoice.dart';
 import 'package:billmate/features/billing/domain/entities/customer.dart';
+import 'package:billmate/features/billing/domain/entities/payment_history.dart';
 
 abstract class BillingRepository {
   // Invoice operations
@@ -20,6 +21,12 @@ abstract class BillingRepository {
   );
   Future<bool> validateInventoryQuantity(int itemId, int requestedQuantity);
   Future<int> getAvailableStock(int itemId);
+
+  // Payment history operations
+  Future<PaymentHistory> createPaymentHistory(PaymentHistory paymentHistory);
+  Future<List<PaymentHistory>> getPaymentHistoryByInvoice(int invoiceId);
+  Future<List<PaymentHistory>> getAllPaymentHistory();
+  Future<void> deletePaymentHistory(int id);
 
   // Customer operations
   Future<List<Customer>> getAllCustomers();

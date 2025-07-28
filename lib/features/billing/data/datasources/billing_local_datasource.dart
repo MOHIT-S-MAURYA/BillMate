@@ -1,6 +1,7 @@
 import 'package:billmate/core/database/database_helper.dart';
 import 'package:billmate/features/billing/data/models/invoice_model.dart';
 import 'package:billmate/features/billing/data/models/customer_model.dart';
+import 'package:billmate/features/billing/data/models/payment_history_model.dart';
 import 'package:injectable/injectable.dart';
 
 abstract class BillingLocalDataSource {
@@ -25,6 +26,12 @@ abstract class BillingLocalDataSource {
   );
   Future<bool> validateInventoryQuantity(int itemId, int requestedQuantity);
   Future<int> getAvailableStock(int itemId);
+
+  // Payment history operations
+  Future<int> createPaymentHistory(PaymentHistoryModel paymentHistory);
+  Future<List<PaymentHistoryModel>> getPaymentHistoryByInvoice(int invoiceId);
+  Future<List<PaymentHistoryModel>> getAllPaymentHistory();
+  Future<void> deletePaymentHistory(int id);
 
   // Customer operations
   Future<List<CustomerModel>> getAllCustomers();
@@ -311,17 +318,33 @@ class BillingLocalDataSourceImpl implements BillingLocalDataSource {
     double paidAmount,
   ) async {
     final db = await databaseHelper.database;
-    await db.update(
-      'invoices',
-      {
-        'payment_status': status,
-        'paid_amount': paidAmount,
-        'payment_date': DateTime.now().toIso8601String(),
-        'updated_at': DateTime.now().toIso8601String(),
-      },
-      where: 'id = ?',
-      whereArgs: [invoiceId],
-    );
+
+    await db.transaction((txn) async {
+      // Update invoice payment status and paid amount
+      await txn.update(
+        'invoices',
+        {
+          'payment_status': status,
+          'paid_amount': paidAmount,
+          'payment_date': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        where: 'id = ?',
+        whereArgs: [invoiceId],
+      );
+
+      // Create payment history record
+      final now = DateTime.now().toIso8601String();
+      await txn.insert('payment_history', {
+        'invoice_id': invoiceId,
+        'payment_amount': paidAmount,
+        'payment_method':
+            'cash', // Default method - should be updated to accept method parameter
+        'payment_date': now,
+        'created_at': now,
+        'updated_at': now,
+      });
+    });
   }
 
   @override
@@ -517,5 +540,44 @@ class BillingLocalDataSourceImpl implements BillingLocalDataSource {
       GROUP BY payment_status
       ORDER BY total_amount DESC
     ''');
+  }
+
+  // Payment history operations
+  @override
+  Future<int> createPaymentHistory(PaymentHistoryModel paymentHistory) async {
+    final db = await databaseHelper.database;
+    return await db.insert('payment_history', paymentHistory.toJson());
+  }
+
+  @override
+  Future<List<PaymentHistoryModel>> getPaymentHistoryByInvoice(
+    int invoiceId,
+  ) async {
+    final db = await databaseHelper.database;
+    final result = await db.query(
+      'payment_history',
+      where: 'invoice_id = ?',
+      whereArgs: [invoiceId],
+      orderBy: 'payment_date ASC',
+    );
+
+    return result.map((json) => PaymentHistoryModel.fromJson(json)).toList();
+  }
+
+  @override
+  Future<List<PaymentHistoryModel>> getAllPaymentHistory() async {
+    final db = await databaseHelper.database;
+    final result = await db.query(
+      'payment_history',
+      orderBy: 'payment_date DESC',
+    );
+
+    return result.map((json) => PaymentHistoryModel.fromJson(json)).toList();
+  }
+
+  @override
+  Future<void> deletePaymentHistory(int id) async {
+    final db = await databaseHelper.database;
+    await db.delete('payment_history', where: 'id = ?', whereArgs: [id]);
   }
 }

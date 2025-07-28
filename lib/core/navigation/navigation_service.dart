@@ -128,7 +128,8 @@ class NavigationService {
       context: context!,
       barrierDismissible: barrierDismissible,
       barrierColor: barrierColor ?? Colors.black54,
-      barrierLabel: barrierLabel,
+      barrierLabel:
+          barrierLabel ?? (barrierDismissible ? 'Dismiss dialog' : null),
       transitionDuration:
           transitionDuration ?? const Duration(milliseconds: 200),
       pageBuilder: (context, animation, secondaryAnimation) => child,

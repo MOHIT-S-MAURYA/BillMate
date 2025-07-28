@@ -41,7 +41,11 @@ class _SmartCustomerSearchFieldState extends State<SmartCustomerSearchField> {
   List<Customer> _searchResults = [];
   Customer? _selectedCustomer;
   bool _isSearching = false;
+  // Track dropdown visibility state for overlay management
   bool _showDropdown = false;
+
+  // Getter to access dropdown state (used internally for state management)
+  bool get isDropdownVisible => _showDropdown;
 
   @override
   void initState() {

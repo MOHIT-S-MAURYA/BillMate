@@ -10,6 +10,8 @@ import 'package:billmate/features/inventory/domain/entities/item.dart';
 import 'package:billmate/shared/constants/app_colors.dart';
 import 'package:billmate/core/events/inventory_events.dart' as events;
 import 'package:billmate/core/navigation/modern_navigation_widgets.dart';
+import 'package:billmate/core/debug/database_debug_helper.dart';
+import 'package:billmate/core/widgets/smart_deletion_widgets.dart';
 import 'dart:async';
 
 class InventoryPage extends StatelessWidget {
@@ -266,6 +268,10 @@ class _InventoryViewState extends State<InventoryView>
         }
 
         if (state is ItemsLoaded) {
+          // If no items exist, automatically add sample items
+          if (state.items.isEmpty) {
+            _addSampleItemsIfEmpty(context);
+          }
           return _buildItemsList(state.items, state.categories);
         }
 
@@ -405,12 +411,22 @@ class _InventoryViewState extends State<InventoryView>
                       ),
                 );
 
-                return ItemCard(
-                  item: item,
-                  category: category,
-                  onEdit: () => _showEditItemDialog(item),
+                return SmartDeletableItem(
+                  canDelete: true,
+                  canEdit: true,
+                  deleteConfirmationTitle: 'Delete Item',
+                  deleteConfirmationMessage:
+                      'Are you sure you want to delete "${item.name}"? This action cannot be undone and will permanently remove the item from your inventory.',
                   onDelete: () => _showDeleteItemDialog(item),
-                  onStockUpdate: (newStock) => _updateStock(item.id!, newStock),
+                  onEdit: () => _showEditItemDialog(item),
+                  child: ItemCard(
+                    item: item,
+                    category: category,
+                    onEdit: () => _showEditItemDialog(item),
+                    onDelete: () => _showDeleteItemDialog(item),
+                    onStockUpdate:
+                        (newStock) => _updateStock(item.id!, newStock),
+                  ),
                 );
               },
             ),
@@ -858,7 +874,7 @@ class _InventoryViewState extends State<InventoryView>
       builder: (context, child) {
         // Show different FAB based on current tab
         if (_tabController.index == 2) {
-          // Categories tab
+          // Categories tab - Simple FAB for categories
           return ModernFloatingActionButtonExtended(
             heroTag: "categoryFAB",
             onPressed: () => _showAddCategoryDialog(context),
@@ -867,16 +883,52 @@ class _InventoryViewState extends State<InventoryView>
             label: const Text('Add Category'),
           );
         } else {
-          // All Items or Low Stock tabs
-          return ModernFloatingActionButtonExtended(
-            heroTag: "inventoryFAB",
-            onPressed: () => _showAddItemDialog(context),
-            backgroundColor: AppColors.primary,
-            icon: const Icon(Icons.add),
-            label: const Text('Add Item'),
+          // All Items or Low Stock tabs - Smart Action Button
+          return SmartActionButton(
+            actions: [
+              SmartAction(
+                icon: Icons.refresh,
+                onTap: () => _refreshInventory(),
+                backgroundColor: AppColors.info,
+                tooltip: 'Refresh Inventory',
+              ),
+              SmartAction(
+                icon: Icons.download,
+                onTap: () => _exportInventory(),
+                backgroundColor: AppColors.secondary,
+                tooltip: 'Export Inventory',
+              ),
+              SmartAction(
+                icon: Icons.analytics,
+                onTap: () => _showInventoryStats(),
+                backgroundColor: Colors.purple,
+                tooltip: 'Inventory Analytics',
+              ),
+            ],
+            child: const Icon(Icons.add),
           );
         }
       },
+    );
+  }
+
+  void _exportInventory() {
+    // TODO: Implement inventory export functionality
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Export functionality coming soon!'),
+        backgroundColor: AppColors.info,
+      ),
+    );
+  }
+
+  void _showInventoryStats() {
+    // TODO: Implement inventory statistics view
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Inventory analytics coming soon!'),
+        backgroundColor: AppColors.info,
+      ),
     );
   }
 
@@ -1316,5 +1368,17 @@ class _InventoryViewState extends State<InventoryView>
 
   void _updateStock(int itemId, int newStock) {
     context.read<InventoryBloc>().add(UpdateStock(itemId, newStock));
+  }
+
+  void _addSampleItemsIfEmpty(BuildContext context) {
+    // Add sample items to help users get started
+    DatabaseDebugHelper.addSampleItems()
+        .then((_) {
+          // Reload the items after adding samples
+          context.read<InventoryBloc>().add(LoadAllItems());
+        })
+        .catchError((error) {
+          debugPrint('Error adding sample items: $error');
+        });
   }
 }
