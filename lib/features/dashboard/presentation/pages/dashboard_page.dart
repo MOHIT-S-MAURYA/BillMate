@@ -4,6 +4,7 @@ import 'package:billmate/shared/constants/app_colors.dart';
 import 'package:billmate/features/dashboard/presentation/bloc/dashboard_bloc.dart';
 import 'package:billmate/features/billing/services/payment_alert_service.dart';
 import 'package:billmate/core/di/injection_container.dart';
+import 'package:billmate/features/reports/presentation/pages/reports_page.dart';
 import 'package:decimal/decimal.dart';
 
 class DashboardPage extends StatelessWidget {
@@ -408,7 +409,14 @@ class DashboardView extends StatelessWidget {
                 title: 'Reports',
                 icon: Icons.analytics,
                 color: AppColors.warning,
-                onTap: () => onNavigate(4), // Navigate to settings/reports tab
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ReportsPage(),
+                    ),
+                  );
+                },
               ),
             ),
           ],

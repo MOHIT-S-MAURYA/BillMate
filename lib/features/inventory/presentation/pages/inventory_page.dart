@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:decimal/decimal.dart';
 import 'package:billmate/core/di/injection_container.dart';
 import 'package:billmate/features/inventory/presentation/bloc/inventory_bloc.dart';
 import 'package:billmate/features/inventory/presentation/widgets/add_item_dialog.dart';
@@ -913,21 +914,410 @@ class _InventoryViewState extends State<InventoryView>
   }
 
   void _exportInventory() {
-    // TODO: Implement inventory export functionality
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Export functionality coming soon!'),
-        backgroundColor: AppColors.info,
-      ),
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Export Inventory'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Choose export format:'),
+                const SizedBox(height: 16),
+                ListTile(
+                  leading: const Icon(Icons.table_chart),
+                  title: const Text('CSV Format'),
+                  subtitle: const Text('Excel compatible spreadsheet'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _exportToCSV();
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.picture_as_pdf),
+                  title: const Text('PDF Report'),
+                  subtitle: const Text('Detailed inventory report'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _exportToPDF();
+                  },
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  void _exportToCSV() {
+    final state = context.read<InventoryBloc>().state;
+    if (state is! ItemsLoaded) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No items to export'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    try {
+      final items = state.items;
+      final csvData = StringBuffer();
+
+      // Add headers
+      csvData.writeln(
+        'Item Name,Description,HSN Code,Unit,Stock Quantity,Purchase Price,Selling Price,Tax Rate,Low Stock Alert,Total Value',
+      );
+
+      // Add data rows
+      for (final item in items) {
+        final totalValue =
+            item.sellingPrice * Decimal.fromInt(item.stockQuantity);
+        csvData.writeln(
+          '"${item.name}","${item.description ?? ''}","${item.hsnCode ?? ''}","${item.unit}",${item.stockQuantity},${item.purchasePrice ?? 0},${item.sellingPrice},${item.taxRate},${item.lowStockAlert},$totalValue',
+        );
+      }
+
+      // For web/mobile, show the CSV content or save functionality would go here
+      // Since we can't directly save files in Flutter web/mobile without additional packages,
+      // we'll show a dialog with the CSV content that can be copied
+      _showExportResult(
+        'CSV Export',
+        csvData.toString(),
+        'inventory_export.csv',
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Export failed: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
+  void _exportToPDF() {
+    final state = context.read<InventoryBloc>().state;
+    if (state is! ItemsLoaded) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No items to export'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    try {
+      final items = state.items;
+      final totalItems = items.length;
+      final totalValue = items.fold<double>(
+        0.0,
+        (sum, item) =>
+            sum + (item.sellingPrice.toDouble() * item.stockQuantity),
+      );
+      final lowStockItems =
+          items
+              .where((item) => item.stockQuantity <= item.lowStockAlert)
+              .length;
+
+      // Create a simple text-based report (in a real implementation, you'd use pdf package)
+      final reportContent = StringBuffer();
+      reportContent.writeln('INVENTORY REPORT');
+      reportContent.writeln(
+        'Generated: ${DateTime.now().toString().split('.')[0]}',
+      );
+      reportContent.writeln('=' * 50);
+      reportContent.writeln();
+      reportContent.writeln('SUMMARY:');
+      reportContent.writeln('Total Items: $totalItems');
+      reportContent.writeln(
+        'Total Inventory Value: ₹${totalValue.toStringAsFixed(2)}',
+      );
+      reportContent.writeln('Low Stock Items: $lowStockItems');
+      reportContent.writeln();
+      reportContent.writeln('ITEM DETAILS:');
+      reportContent.writeln('-' * 50);
+
+      for (final item in items) {
+        final value = item.sellingPrice.toDouble() * item.stockQuantity;
+        reportContent.writeln(item.name);
+        reportContent.writeln('  Stock: ${item.stockQuantity} ${item.unit}');
+        reportContent.writeln('  Price: ₹${item.sellingPrice}');
+        reportContent.writeln('  Value: ₹${value.toStringAsFixed(2)}');
+        if (item.stockQuantity <= item.lowStockAlert) {
+          reportContent.writeln('  ⚠️ LOW STOCK ALERT');
+        }
+        reportContent.writeln();
+      }
+
+      _showExportResult(
+        'PDF Report',
+        reportContent.toString(),
+        'inventory_report.txt',
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Report generation failed: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
+  void _showExportResult(String title, String content, String filename) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text(title),
+            content: SizedBox(
+              width: double.maxFinite,
+              height: 400,
+              child: Column(
+                children: [
+                  Text('File: $filename'),
+                  const SizedBox(height: 16),
+                  Expanded(
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: SingleChildScrollView(
+                        child: Text(
+                          content,
+                          style: const TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Copy the content above to save as a file',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
     );
   }
 
   void _showInventoryStats() {
-    // TODO: Implement inventory statistics view
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Inventory analytics coming soon!'),
-        backgroundColor: AppColors.info,
+    final state = context.read<InventoryBloc>().state;
+    if (state is! ItemsLoaded) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No data available for statistics'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    final items = state.items;
+
+    // Calculate statistics
+    final totalItems = items.length;
+    final totalValue = items.fold<double>(
+      0.0,
+      (sum, item) => sum + (item.sellingPrice.toDouble() * item.stockQuantity),
+    );
+    final totalStock = items.fold<int>(
+      0,
+      (sum, item) => sum + item.stockQuantity,
+    );
+    final lowStockItems =
+        items
+            .where((item) => item.stockQuantity <= item.lowStockAlert)
+            .toList();
+    final outOfStockItems =
+        items.where((item) => item.stockQuantity == 0).length;
+
+    final averageValue = totalItems > 0 ? totalValue / totalItems : 0.0;
+    final averageStock = totalItems > 0 ? totalStock / totalItems : 0.0;
+
+    // Get top valuable items
+    final topValueItems = [...items]..sort(
+      (a, b) => (b.sellingPrice.toDouble() * b.stockQuantity).compareTo(
+        a.sellingPrice.toDouble() * a.stockQuantity,
+      ),
+    );
+    final topItems = topValueItems.take(5).toList();
+
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Inventory Statistics'),
+            content: SizedBox(
+              width: double.maxFinite,
+              height: 500,
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildStatCard(
+                      'Total Items',
+                      totalItems.toString(),
+                      Icons.inventory,
+                    ),
+                    _buildStatCard(
+                      'Total Stock Units',
+                      totalStock.toString(),
+                      Icons.storage,
+                    ),
+                    _buildStatCard(
+                      'Total Value',
+                      '₹${totalValue.toStringAsFixed(2)}',
+                      Icons.monetization_on,
+                    ),
+                    _buildStatCard(
+                      'Average Value per Item',
+                      '₹${averageValue.toStringAsFixed(2)}',
+                      Icons.analytics,
+                    ),
+                    _buildStatCard(
+                      'Average Stock per Item',
+                      averageStock.toStringAsFixed(1),
+                      Icons.trending_up,
+                    ),
+                    _buildStatCard(
+                      'Low Stock Items',
+                      lowStockItems.length.toString(),
+                      Icons.warning,
+                      color:
+                          lowStockItems.isNotEmpty
+                              ? AppColors.warning
+                              : AppColors.success,
+                    ),
+                    _buildStatCard(
+                      'Out of Stock',
+                      outOfStockItems.toString(),
+                      Icons.error_outline,
+                      color:
+                          outOfStockItems > 0
+                              ? AppColors.error
+                              : AppColors.success,
+                    ),
+
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Top 5 Most Valuable Items:',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ...topItems.map(
+                      (item) => Card(
+                        child: ListTile(
+                          title: Text(item.name),
+                          subtitle: Text('${item.stockQuantity} ${item.unit}'),
+                          trailing: Text(
+                            '₹${(item.sellingPrice.toDouble() * item.stockQuantity).toStringAsFixed(2)}',
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    if (lowStockItems.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Low Stock Alert:',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.warning,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      ...lowStockItems
+                          .take(5)
+                          .map(
+                            (item) => Card(
+                              color: AppColors.warning.withValues(alpha: 0.1),
+                              child: ListTile(
+                                leading: const Icon(
+                                  Icons.warning,
+                                  color: AppColors.warning,
+                                ),
+                                title: Text(item.name),
+                                subtitle: Text(
+                                  'Stock: ${item.stockQuantity} (Alert: ${item.lowStockAlert})',
+                                ),
+                              ),
+                            ),
+                          ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  Widget _buildStatCard(
+    String title,
+    String value,
+    IconData icon, {
+    Color? color,
+  }) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Icon(icon, color: color ?? AppColors.primary, size: 24),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                  Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: color ?? Colors.black,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -967,12 +1357,7 @@ class _InventoryViewState extends State<InventoryView>
                   subtitle: const Text('View detailed inventory analytics'),
                   onTap: () {
                     Navigator.pop(context);
-                    // TODO: Implement inventory report
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Inventory report feature coming soon!'),
-                      ),
-                    );
+                    _showInventoryReport();
                   },
                 ),
               ],
@@ -1370,6 +1755,26 @@ class _InventoryViewState extends State<InventoryView>
     context.read<InventoryBloc>().add(UpdateStock(itemId, newStock));
   }
 
+  void _showInventoryReport() {
+    final state = context.read<InventoryBloc>().state;
+    if (state is! ItemsLoaded) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No data available for report'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => InventoryReportPage(items: state.items),
+      ),
+    );
+  }
+
   void _addSampleItemsIfEmpty(BuildContext context) async {
     // Add sample items to help users get started
     try {
@@ -1383,5 +1788,340 @@ class _InventoryViewState extends State<InventoryView>
     } catch (error) {
       debugPrint('Error adding sample items: $error');
     }
+  }
+}
+
+class InventoryReportPage extends StatelessWidget {
+  final List<Item> items;
+
+  const InventoryReportPage({super.key, required this.items});
+
+  @override
+  Widget build(BuildContext context) {
+    // Calculate comprehensive statistics
+    final totalItems = items.length;
+    final totalValue = items.fold<double>(
+      0.0,
+      (sum, item) => sum + (item.sellingPrice.toDouble() * item.stockQuantity),
+    );
+    final totalStock = items.fold<int>(
+      0,
+      (sum, item) => sum + item.stockQuantity,
+    );
+    final lowStockItems =
+        items
+            .where((item) => item.stockQuantity <= item.lowStockAlert)
+            .toList();
+    final outOfStockItems =
+        items.where((item) => item.stockQuantity == 0).toList();
+    final highValueItems =
+        items
+            .where(
+              (item) =>
+                  item.sellingPrice.toDouble() * item.stockQuantity > 1000,
+            )
+            .toList();
+
+    // Category analysis (simplified since we don't have category names)
+    final categoryMap = <int?, int>{};
+    for (final item in items) {
+      categoryMap[item.categoryId] = (categoryMap[item.categoryId] ?? 0) + 1;
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Inventory Report'),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.share),
+            onPressed: () => _shareReport(context),
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Inventory Report',
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      'Generated on ${DateTime.now().toString().split(' ')[0]}',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Summary Section
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Summary',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildSummaryItem(
+                            'Total Items',
+                            totalItems.toString(),
+                            Icons.inventory,
+                          ),
+                        ),
+                        Expanded(
+                          child: _buildSummaryItem(
+                            'Total Stock',
+                            totalStock.toString(),
+                            Icons.storage,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildSummaryItem(
+                            'Total Value',
+                            '₹${totalValue.toStringAsFixed(2)}',
+                            Icons.monetization_on,
+                          ),
+                        ),
+                        Expanded(
+                          child: _buildSummaryItem(
+                            'Avg. Value',
+                            '₹${(totalValue / totalItems).toStringAsFixed(2)}',
+                            Icons.analytics,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Alerts Section
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Inventory Alerts',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildAlertItem(
+                            'Low Stock',
+                            lowStockItems.length.toString(),
+                            Icons.warning,
+                            AppColors.warning,
+                          ),
+                        ),
+                        Expanded(
+                          child: _buildAlertItem(
+                            'Out of Stock',
+                            outOfStockItems.length.toString(),
+                            Icons.error_outline,
+                            AppColors.error,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Low Stock Items
+            if (lowStockItems.isNotEmpty) ...[
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Low Stock Items (${lowStockItems.length})',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.warning,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      ...lowStockItems
+                          .take(10)
+                          .map(
+                            (item) => ListTile(
+                              leading: const Icon(
+                                Icons.warning,
+                                color: AppColors.warning,
+                                size: 20,
+                              ),
+                              title: Text(item.name),
+                              subtitle: Text(
+                                'Stock: ${item.stockQuantity} ${item.unit} (Alert: ${item.lowStockAlert})',
+                              ),
+                              trailing: Text('₹${item.sellingPrice}'),
+                              dense: true,
+                            ),
+                          ),
+                      if (lowStockItems.length > 10)
+                        Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: Text(
+                            '... and ${lowStockItems.length - 10} more items',
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            // High Value Items
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'High Value Items (₹1000+)',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.success,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    if (highValueItems.isEmpty)
+                      const Text('No items with total value over ₹1000')
+                    else
+                      ...highValueItems.take(10).map((item) {
+                        final value =
+                            item.sellingPrice.toDouble() * item.stockQuantity;
+                        return ListTile(
+                          leading: const Icon(
+                            Icons.star,
+                            color: AppColors.success,
+                            size: 20,
+                          ),
+                          title: Text(item.name),
+                          subtitle: Text(
+                            '${item.stockQuantity} ${item.unit} × ₹${item.sellingPrice}',
+                          ),
+                          trailing: Text('₹${value.toStringAsFixed(2)}'),
+                          dense: true,
+                        );
+                      }),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSummaryItem(String title, String value, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: AppColors.primary, size: 24),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          Text(title, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAlertItem(
+    String title,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: color, size: 24),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          Text(title, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        ],
+      ),
+    );
+  }
+
+  void _shareReport(BuildContext context) {
+    // In a real implementation, you would generate and share the report
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Report sharing functionality would be implemented here'),
+        backgroundColor: AppColors.info,
+      ),
+    );
   }
 }
