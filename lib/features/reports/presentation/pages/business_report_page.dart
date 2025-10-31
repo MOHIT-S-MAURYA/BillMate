@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:decimal/decimal.dart';
+import 'package:billmate/core/di/injection_container.dart';
+import 'package:billmate/core/localization/country_service.dart';
 import 'package:billmate/features/reports/presentation/bloc/reports_bloc.dart';
 import 'package:billmate/features/reports/domain/entities/report.dart';
 import 'package:billmate/features/reports/presentation/widgets/date_range_picker.dart';
@@ -155,7 +157,9 @@ class _BusinessSummaryCards extends StatelessWidget {
             Expanded(
               child: _SummaryCard(
                 title: 'Total Revenue',
-                value: '\$${report.totalRevenue.toStringAsFixed(2)}',
+                value: getIt<CountryService>().formatCurrency(
+                  report.totalRevenue.toDouble(),
+                ),
                 icon: Icons.trending_up,
                 color: Colors.green,
               ),
@@ -164,7 +168,9 @@ class _BusinessSummaryCards extends StatelessWidget {
             Expanded(
               child: _SummaryCard(
                 title: 'Total Profit',
-                value: '\$${report.totalProfit.toStringAsFixed(2)}',
+                value: getIt<CountryService>().formatCurrency(
+                  report.totalProfit.toDouble(),
+                ),
                 icon: Icons.account_balance_wallet,
                 color: Colors.blue,
               ),
@@ -382,7 +388,11 @@ class _MonthlyGrowthChart extends StatelessWidget {
                       ),
                     ),
                     title: Text(_formatMonth(growth.month)),
-                    subtitle: Text('\$${growth.revenue.toStringAsFixed(2)}'),
+                    subtitle: Text(
+                      getIt<CountryService>().formatCurrency(
+                        growth.revenue.toDouble(),
+                      ),
+                    ),
                     trailing: Text(
                       '${growth.growthRate.toStringAsFixed(1)}%',
                       style: TextStyle(

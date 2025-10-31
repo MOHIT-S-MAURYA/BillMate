@@ -1,7 +1,10 @@
+import 'package:billmate/shared/widgets/empty_state/empty_state_widget.dart';
+import 'package:billmate/shared/widgets/loading/loading_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:decimal/decimal.dart';
 import 'package:billmate/core/di/injection_container.dart';
+import 'package:billmate/core/localization/country_service.dart';
 import 'package:billmate/features/inventory/presentation/bloc/inventory_bloc.dart';
 import 'package:billmate/features/inventory/presentation/widgets/add_item_dialog.dart';
 import 'package:billmate/features/inventory/presentation/widgets/edit_item_dialog.dart';
@@ -11,7 +14,6 @@ import 'package:billmate/features/inventory/domain/entities/item.dart';
 import 'package:billmate/shared/constants/app_colors.dart';
 import 'package:billmate/core/events/inventory_events.dart' as events;
 import 'package:billmate/core/navigation/modern_navigation_widgets.dart';
-import 'package:billmate/core/debug/database_debug_helper.dart';
 import 'package:billmate/core/widgets/smart_deletion_widgets.dart';
 import 'dart:async';
 
@@ -214,162 +216,55 @@ class _InventoryViewState extends State<InventoryView>
   }
 
   Widget _buildTabBarView() {
-    return TabBarView(
-      controller: _tabController,
-      children: [
-        _buildAllItemsTab(),
-        _buildLowStockTab(),
-        _buildCategoriesTab(),
-      ],
-    );
-  }
-
-  Widget _buildAllItemsTab() {
-    return BlocConsumer<InventoryBloc, InventoryState>(
-      listener: (context, state) {
-        if (state is InventoryError) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.error, color: Colors.white),
-                  const SizedBox(width: 12),
-                  Expanded(child: Text('Error: ${state.message}')),
-                ],
-              ),
-              backgroundColor: AppColors.error,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          );
-        } else if (state is InventorySuccess) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.check_circle, color: Colors.white),
-                  const SizedBox(width: 12),
-                  Text(state.message),
-                ],
-              ),
-              backgroundColor: AppColors.success,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          );
-        }
-      },
-      builder: (context, state) {
-        if (state is InventoryLoading) {
-          return _buildLoadingState();
-        }
-
-        if (state is ItemsLoaded) {
-          // If no items exist, automatically add sample items
-          if (state.items.isEmpty) {
-            _addSampleItemsIfEmpty(context);
-          }
-          return _buildItemsList(state.items, state.categories);
-        }
-
-        if (state is InventoryError) {
-          return _buildErrorState(context, state.message);
-        }
-
-        return _buildEmptyState(context);
-      },
-    );
-  }
-
-  Widget _buildLowStockTab() {
     return BlocBuilder<InventoryBloc, InventoryState>(
       builder: (context, state) {
         if (state is InventoryLoading) {
-          return _buildLoadingState();
+          return const LoadingGridView();
         }
-
         if (state is ItemsLoaded) {
+          final allItems = state.items;
           final lowStockItems =
-              state.items.where((item) {
-                return item.stockQuantity <= item.lowStockAlert;
-              }).toList();
+              allItems
+                  .where((item) => item.stockQuantity <= item.lowStockAlert)
+                  .toList();
+          final categories = state.categories;
 
-          if (lowStockItems.isEmpty) {
-            return _buildEmptyLowStockState();
-          }
-
-          return _buildItemsList(lowStockItems, state.categories);
+          return TabBarView(
+            controller: _tabController,
+            children: [
+              _buildItemsList(allItems, categories),
+              _buildItemsList(lowStockItems, categories),
+              _buildCategoriesList(categories),
+            ],
+          );
         }
-
-        return _buildEmptyState(context);
-      },
-    );
-  }
-
-  Widget _buildCategoriesTab() {
-    return BlocConsumer<InventoryBloc, InventoryState>(
-      listener: (context, state) {
         if (state is InventoryError) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.error, color: Colors.white),
-                  const SizedBox(width: 12),
-                  Expanded(child: Text('Error: ${state.message}')),
-                ],
-              ),
-              backgroundColor: AppColors.error,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              margin: const EdgeInsets.all(16),
-              duration: const Duration(seconds: 3),
-            ),
-          );
-        } else if (state is InventorySuccess) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.check_circle, color: Colors.white),
-                  const SizedBox(width: 12),
-                  Expanded(child: Text(state.message)),
-                ],
-              ),
-              backgroundColor: AppColors.success,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              margin: const EdgeInsets.all(16),
-              duration: const Duration(seconds: 2),
-            ),
+          return EmptyStateWidget(
+            message: state.message,
+            icon: Icons.error_outline,
+            onRetry: _refreshInventory,
           );
         }
-      },
-      builder: (context, state) {
-        if (state is InventoryLoading) {
-          return _buildLoadingState();
-        }
-
-        if (state is ItemsLoaded) {
-          return _buildCategoriesList(state.categories);
-        }
-
-        return _buildEmptyState(context);
+        return const EmptyStateWidget(
+          message: 'No items found.',
+          icon: Icons.inventory_2_outlined,
+        );
       },
     );
   }
 
   Widget _buildItemsList(List<Item> items, List<Category> categories) {
     if (items.isEmpty) {
-      return _buildEmptySearchState();
+      return EmptyStateWidget(
+        message:
+            _searchQuery.isNotEmpty
+                ? 'No items match "$_searchQuery"'
+                : 'No items in inventory',
+        icon:
+            _searchQuery.isNotEmpty
+                ? Icons.search_off
+                : Icons.inventory_2_outlined,
+      );
     }
 
     return Column(
@@ -587,230 +482,6 @@ class _InventoryViewState extends State<InventoryView>
     );
   }
 
-  Widget _buildLoadingState() {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-          ),
-          SizedBox(height: 16),
-          Text(
-            'Loading inventory...',
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 16),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildErrorState(BuildContext context, String message) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                color: AppColors.error.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.error_outline,
-                size: 60,
-                color: AppColors.error,
-              ),
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'Oops! Something went wrong',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 14,
-              ),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: () {
-                context.read<InventoryBloc>().add(LoadAllItems());
-              },
-              icon: const Icon(Icons.refresh),
-              label: const Text('Try Again'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.inventory_2,
-                size: 60,
-                color: AppColors.primary,
-              ),
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'No items in inventory',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Start by adding your first product or service to manage your inventory',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: () => _showAddItemDialog(context),
-              icon: const Icon(Icons.add),
-              label: const Text('Add First Item'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptySearchState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                color: AppColors.info.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.search_off,
-                size: 60,
-                color: AppColors.info,
-              ),
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'No items found',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'No items match "$_searchQuery". Try a different search term.',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 14,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyLowStockState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                color: AppColors.success.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.check_circle,
-                size: 60,
-                color: AppColors.success,
-              ),
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'All items well stocked!',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Great job! None of your items are running low on stock.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildEmptyCategoriesState() {
     return Center(
       child: Padding(
@@ -887,6 +558,12 @@ class _InventoryViewState extends State<InventoryView>
           // All Items or Low Stock tabs - Smart Action Button
           return SmartActionButton(
             actions: [
+              SmartAction(
+                icon: Icons.add_box,
+                onTap: () => _showAddItemDialog(context),
+                backgroundColor: AppColors.primary,
+                tooltip: 'Add New Item',
+              ),
               SmartAction(
                 icon: Icons.refresh,
                 onTap: () => _refreshInventory(),
@@ -1774,21 +1451,6 @@ class _InventoryViewState extends State<InventoryView>
       ),
     );
   }
-
-  void _addSampleItemsIfEmpty(BuildContext context) async {
-    // Add sample items to help users get started
-    try {
-      await DatabaseDebugHelper.addSampleItems();
-      // Reload the items after adding samples
-      if (mounted) {
-        if (context.mounted) {
-          context.read<InventoryBloc>().add(LoadAllItems());
-        }
-      }
-    } catch (error) {
-      debugPrint('Error adding sample items: $error');
-    }
-  }
 }
 
 class InventoryReportPage extends StatelessWidget {
@@ -1998,7 +1660,11 @@ class InventoryReportPage extends StatelessWidget {
                               subtitle: Text(
                                 'Stock: ${item.stockQuantity} ${item.unit} (Alert: ${item.lowStockAlert})',
                               ),
-                              trailing: Text('₹${item.sellingPrice}'),
+                              trailing: Text(
+                                getIt<CountryService>().formatCurrency(
+                                  item.sellingPrice.toDouble(),
+                                ),
+                              ),
                               dense: true,
                             ),
                           ),
@@ -2032,7 +1698,9 @@ class InventoryReportPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     if (highValueItems.isEmpty)
-                      const Text('No items with total value over ₹1000')
+                      Text(
+                        'No items with total value over ${getIt<CountryService>().formatCurrency(1000)}',
+                      )
                     else
                       ...highValueItems.take(10).map((item) {
                         final value =
@@ -2047,7 +1715,9 @@ class InventoryReportPage extends StatelessWidget {
                           subtitle: Text(
                             '${item.stockQuantity} ${item.unit} × ₹${item.sellingPrice}',
                           ),
-                          trailing: Text('₹${value.toStringAsFixed(2)}'),
+                          trailing: Text(
+                            getIt<CountryService>().formatCurrency(value),
+                          ),
                           dense: true,
                         );
                       }),

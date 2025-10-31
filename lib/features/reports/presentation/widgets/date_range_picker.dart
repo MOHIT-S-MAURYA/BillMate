@@ -126,14 +126,29 @@ class DateRangePicker extends StatelessWidget {
   }
 
   Future<void> _showCustomDatePicker(BuildContext context) async {
+    final now = DateTime.now();
+    final firstDate = DateTime(2020);
+
+    // Ensure the initial range is within bounds
+    var startDate = selectedRange.start;
+    var endDate = selectedRange.end;
+
+    // Clamp dates to valid range
+    if (startDate.isBefore(firstDate)) {
+      startDate = firstDate;
+    }
+    if (endDate.isAfter(now)) {
+      endDate = now;
+    }
+    if (startDate.isAfter(now)) {
+      startDate = now.subtract(const Duration(days: 7));
+    }
+
     final dateRange = await showDateRangePicker(
       context: context,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
-      initialDateRange: DateTimeRange(
-        start: selectedRange.start,
-        end: selectedRange.end,
-      ),
+      firstDate: firstDate,
+      lastDate: now,
+      initialDateRange: DateTimeRange(start: startDate, end: endDate),
     );
 
     if (dateRange != null) {

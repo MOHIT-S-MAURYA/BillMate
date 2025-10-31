@@ -2,6 +2,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:billmate/features/inventory/domain/entities/item.dart';
 import 'package:billmate/features/inventory/domain/usecases/inventory_usecases.dart';
+import 'package:billmate/core/events/inventory_events.dart' as events;
 import 'package:injectable/injectable.dart';
 
 // Events
@@ -235,6 +236,12 @@ class InventoryBloc extends Bloc<InventoryEvent, InventoryState> {
     try {
       await createItemUseCase(event.item);
       emit(const InventorySuccess('Item created successfully'));
+
+      // Emit inventory event
+      if (event.item.id != null) {
+        events.InventoryEventBus().emitItemCreated(event.item.id!);
+      }
+
       add(LoadAllItems());
     } catch (e) {
       emit(InventoryError(e.toString()));
@@ -248,6 +255,12 @@ class InventoryBloc extends Bloc<InventoryEvent, InventoryState> {
     try {
       await updateItemUseCase(event.item);
       emit(const InventorySuccess('Item updated successfully'));
+
+      // Emit inventory event
+      if (event.item.id != null) {
+        events.InventoryEventBus().emitItemUpdated(event.item.id!);
+      }
+
       add(LoadAllItems());
     } catch (e) {
       emit(InventoryError(e.toString()));
@@ -261,6 +274,10 @@ class InventoryBloc extends Bloc<InventoryEvent, InventoryState> {
     try {
       await deleteItemUseCase(event.itemId);
       emit(const InventorySuccess('Item deleted successfully'));
+
+      // Emit inventory event
+      events.InventoryEventBus().emitItemDeleted(event.itemId);
+
       add(LoadAllItems());
     } catch (e) {
       emit(InventoryError(e.toString()));

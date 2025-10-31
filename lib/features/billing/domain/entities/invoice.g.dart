@@ -11,6 +11,8 @@ _$InvoiceImpl _$$InvoiceImplFromJson(Map<String, dynamic> json) =>
       id: (json['id'] as num?)?.toInt(),
       invoiceNumber: json['invoiceNumber'] as String,
       customerId: (json['customerId'] as num?)?.toInt(),
+      customerName: json['customerName'] as String?,
+      customerEmail: json['customerEmail'] as String?,
       invoiceDate: DateTime.parse(json['invoiceDate'] as String),
       dueDate:
           json['dueDate'] == null
@@ -32,6 +34,7 @@ _$InvoiceImpl _$$InvoiceImplFromJson(Map<String, dynamic> json) =>
               : Decimal.fromJson(json['paidAmount'] as String),
       notes: json['notes'] as String?,
       isGstInvoice: json['isGstInvoice'] as bool? ?? true,
+      showTaxOnBill: json['showTaxOnBill'] as bool? ?? true,
       placeOfSupply: json['placeOfSupply'] as String?,
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
@@ -47,6 +50,8 @@ Map<String, dynamic> _$$InvoiceImplToJson(_$InvoiceImpl instance) =>
       'id': instance.id,
       'invoiceNumber': instance.invoiceNumber,
       'customerId': instance.customerId,
+      'customerName': instance.customerName,
+      'customerEmail': instance.customerEmail,
       'invoiceDate': instance.invoiceDate.toIso8601String(),
       'dueDate': instance.dueDate?.toIso8601String(),
       'subtotal': instance.subtotal,
@@ -59,6 +64,7 @@ Map<String, dynamic> _$$InvoiceImplToJson(_$InvoiceImpl instance) =>
       'paidAmount': instance.paidAmount,
       'notes': instance.notes,
       'isGstInvoice': instance.isGstInvoice,
+      'showTaxOnBill': instance.showTaxOnBill,
       'placeOfSupply': instance.placeOfSupply,
       'createdAt': instance.createdAt.toIso8601String(),
       'updatedAt': instance.updatedAt.toIso8601String(),

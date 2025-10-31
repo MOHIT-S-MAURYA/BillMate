@@ -24,6 +24,10 @@ mixin _$Invoice {
   int? get id => throw _privateConstructorUsedError;
   String get invoiceNumber => throw _privateConstructorUsedError;
   int? get customerId => throw _privateConstructorUsedError;
+  String? get customerName =>
+      throw _privateConstructorUsedError; // Store customer name directly in invoice
+  String? get customerEmail =>
+      throw _privateConstructorUsedError; // Store customer email directly in invoice
   DateTime get invoiceDate => throw _privateConstructorUsedError;
   DateTime? get dueDate => throw _privateConstructorUsedError;
   Decimal get subtotal => throw _privateConstructorUsedError;
@@ -37,6 +41,8 @@ mixin _$Invoice {
       throw _privateConstructorUsedError; // New field for partial payments
   String? get notes => throw _privateConstructorUsedError;
   bool get isGstInvoice => throw _privateConstructorUsedError;
+  bool get showTaxOnBill =>
+      throw _privateConstructorUsedError; // New field to control tax display on PDF
   String? get placeOfSupply => throw _privateConstructorUsedError;
   DateTime get createdAt => throw _privateConstructorUsedError;
   DateTime get updatedAt => throw _privateConstructorUsedError;
@@ -60,6 +66,8 @@ abstract class $InvoiceCopyWith<$Res> {
     int? id,
     String invoiceNumber,
     int? customerId,
+    String? customerName,
+    String? customerEmail,
     DateTime invoiceDate,
     DateTime? dueDate,
     Decimal subtotal,
@@ -72,6 +80,7 @@ abstract class $InvoiceCopyWith<$Res> {
     Decimal? paidAmount,
     String? notes,
     bool isGstInvoice,
+    bool showTaxOnBill,
     String? placeOfSupply,
     DateTime createdAt,
     DateTime updatedAt,
@@ -97,6 +106,8 @@ class _$InvoiceCopyWithImpl<$Res, $Val extends Invoice>
     Object? id = freezed,
     Object? invoiceNumber = null,
     Object? customerId = freezed,
+    Object? customerName = freezed,
+    Object? customerEmail = freezed,
     Object? invoiceDate = null,
     Object? dueDate = freezed,
     Object? subtotal = null,
@@ -109,6 +120,7 @@ class _$InvoiceCopyWithImpl<$Res, $Val extends Invoice>
     Object? paidAmount = freezed,
     Object? notes = freezed,
     Object? isGstInvoice = null,
+    Object? showTaxOnBill = null,
     Object? placeOfSupply = freezed,
     Object? createdAt = null,
     Object? updatedAt = null,
@@ -131,6 +143,16 @@ class _$InvoiceCopyWithImpl<$Res, $Val extends Invoice>
                     ? _value.customerId
                     : customerId // ignore: cast_nullable_to_non_nullable
                         as int?,
+            customerName:
+                freezed == customerName
+                    ? _value.customerName
+                    : customerName // ignore: cast_nullable_to_non_nullable
+                        as String?,
+            customerEmail:
+                freezed == customerEmail
+                    ? _value.customerEmail
+                    : customerEmail // ignore: cast_nullable_to_non_nullable
+                        as String?,
             invoiceDate:
                 null == invoiceDate
                     ? _value.invoiceDate
@@ -191,6 +213,11 @@ class _$InvoiceCopyWithImpl<$Res, $Val extends Invoice>
                     ? _value.isGstInvoice
                     : isGstInvoice // ignore: cast_nullable_to_non_nullable
                         as bool,
+            showTaxOnBill:
+                null == showTaxOnBill
+                    ? _value.showTaxOnBill
+                    : showTaxOnBill // ignore: cast_nullable_to_non_nullable
+                        as bool,
             placeOfSupply:
                 freezed == placeOfSupply
                     ? _value.placeOfSupply
@@ -229,6 +256,8 @@ abstract class _$$InvoiceImplCopyWith<$Res> implements $InvoiceCopyWith<$Res> {
     int? id,
     String invoiceNumber,
     int? customerId,
+    String? customerName,
+    String? customerEmail,
     DateTime invoiceDate,
     DateTime? dueDate,
     Decimal subtotal,
@@ -241,6 +270,7 @@ abstract class _$$InvoiceImplCopyWith<$Res> implements $InvoiceCopyWith<$Res> {
     Decimal? paidAmount,
     String? notes,
     bool isGstInvoice,
+    bool showTaxOnBill,
     String? placeOfSupply,
     DateTime createdAt,
     DateTime updatedAt,
@@ -265,6 +295,8 @@ class __$$InvoiceImplCopyWithImpl<$Res>
     Object? id = freezed,
     Object? invoiceNumber = null,
     Object? customerId = freezed,
+    Object? customerName = freezed,
+    Object? customerEmail = freezed,
     Object? invoiceDate = null,
     Object? dueDate = freezed,
     Object? subtotal = null,
@@ -277,6 +309,7 @@ class __$$InvoiceImplCopyWithImpl<$Res>
     Object? paidAmount = freezed,
     Object? notes = freezed,
     Object? isGstInvoice = null,
+    Object? showTaxOnBill = null,
     Object? placeOfSupply = freezed,
     Object? createdAt = null,
     Object? updatedAt = null,
@@ -299,6 +332,16 @@ class __$$InvoiceImplCopyWithImpl<$Res>
                 ? _value.customerId
                 : customerId // ignore: cast_nullable_to_non_nullable
                     as int?,
+        customerName:
+            freezed == customerName
+                ? _value.customerName
+                : customerName // ignore: cast_nullable_to_non_nullable
+                    as String?,
+        customerEmail:
+            freezed == customerEmail
+                ? _value.customerEmail
+                : customerEmail // ignore: cast_nullable_to_non_nullable
+                    as String?,
         invoiceDate:
             null == invoiceDate
                 ? _value.invoiceDate
@@ -359,6 +402,11 @@ class __$$InvoiceImplCopyWithImpl<$Res>
                 ? _value.isGstInvoice
                 : isGstInvoice // ignore: cast_nullable_to_non_nullable
                     as bool,
+        showTaxOnBill:
+            null == showTaxOnBill
+                ? _value.showTaxOnBill
+                : showTaxOnBill // ignore: cast_nullable_to_non_nullable
+                    as bool,
         placeOfSupply:
             freezed == placeOfSupply
                 ? _value.placeOfSupply
@@ -391,6 +439,8 @@ class _$InvoiceImpl implements _Invoice {
     this.id,
     required this.invoiceNumber,
     this.customerId,
+    this.customerName,
+    this.customerEmail,
     required this.invoiceDate,
     this.dueDate,
     required this.subtotal,
@@ -403,6 +453,7 @@ class _$InvoiceImpl implements _Invoice {
     this.paidAmount,
     this.notes,
     this.isGstInvoice = true,
+    this.showTaxOnBill = true,
     this.placeOfSupply,
     required this.createdAt,
     required this.updatedAt,
@@ -418,6 +469,12 @@ class _$InvoiceImpl implements _Invoice {
   final String invoiceNumber;
   @override
   final int? customerId;
+  @override
+  final String? customerName;
+  // Store customer name directly in invoice
+  @override
+  final String? customerEmail;
+  // Store customer email directly in invoice
   @override
   final DateTime invoiceDate;
   @override
@@ -447,6 +504,10 @@ class _$InvoiceImpl implements _Invoice {
   @JsonKey()
   final bool isGstInvoice;
   @override
+  @JsonKey()
+  final bool showTaxOnBill;
+  // New field to control tax display on PDF
+  @override
   final String? placeOfSupply;
   @override
   final DateTime createdAt;
@@ -463,7 +524,7 @@ class _$InvoiceImpl implements _Invoice {
 
   @override
   String toString() {
-    return 'Invoice(id: $id, invoiceNumber: $invoiceNumber, customerId: $customerId, invoiceDate: $invoiceDate, dueDate: $dueDate, subtotal: $subtotal, taxAmount: $taxAmount, discountAmount: $discountAmount, totalAmount: $totalAmount, paymentStatus: $paymentStatus, paymentMethod: $paymentMethod, paymentDate: $paymentDate, paidAmount: $paidAmount, notes: $notes, isGstInvoice: $isGstInvoice, placeOfSupply: $placeOfSupply, createdAt: $createdAt, updatedAt: $updatedAt, items: $items)';
+    return 'Invoice(id: $id, invoiceNumber: $invoiceNumber, customerId: $customerId, customerName: $customerName, customerEmail: $customerEmail, invoiceDate: $invoiceDate, dueDate: $dueDate, subtotal: $subtotal, taxAmount: $taxAmount, discountAmount: $discountAmount, totalAmount: $totalAmount, paymentStatus: $paymentStatus, paymentMethod: $paymentMethod, paymentDate: $paymentDate, paidAmount: $paidAmount, notes: $notes, isGstInvoice: $isGstInvoice, showTaxOnBill: $showTaxOnBill, placeOfSupply: $placeOfSupply, createdAt: $createdAt, updatedAt: $updatedAt, items: $items)';
   }
 
   @override
@@ -476,6 +537,10 @@ class _$InvoiceImpl implements _Invoice {
                 other.invoiceNumber == invoiceNumber) &&
             (identical(other.customerId, customerId) ||
                 other.customerId == customerId) &&
+            (identical(other.customerName, customerName) ||
+                other.customerName == customerName) &&
+            (identical(other.customerEmail, customerEmail) ||
+                other.customerEmail == customerEmail) &&
             (identical(other.invoiceDate, invoiceDate) ||
                 other.invoiceDate == invoiceDate) &&
             (identical(other.dueDate, dueDate) || other.dueDate == dueDate) &&
@@ -498,6 +563,8 @@ class _$InvoiceImpl implements _Invoice {
             (identical(other.notes, notes) || other.notes == notes) &&
             (identical(other.isGstInvoice, isGstInvoice) ||
                 other.isGstInvoice == isGstInvoice) &&
+            (identical(other.showTaxOnBill, showTaxOnBill) ||
+                other.showTaxOnBill == showTaxOnBill) &&
             (identical(other.placeOfSupply, placeOfSupply) ||
                 other.placeOfSupply == placeOfSupply) &&
             (identical(other.createdAt, createdAt) ||
@@ -514,6 +581,8 @@ class _$InvoiceImpl implements _Invoice {
     id,
     invoiceNumber,
     customerId,
+    customerName,
+    customerEmail,
     invoiceDate,
     dueDate,
     subtotal,
@@ -526,6 +595,7 @@ class _$InvoiceImpl implements _Invoice {
     paidAmount,
     notes,
     isGstInvoice,
+    showTaxOnBill,
     placeOfSupply,
     createdAt,
     updatedAt,
@@ -551,6 +621,8 @@ abstract class _Invoice implements Invoice {
     final int? id,
     required final String invoiceNumber,
     final int? customerId,
+    final String? customerName,
+    final String? customerEmail,
     required final DateTime invoiceDate,
     final DateTime? dueDate,
     required final Decimal subtotal,
@@ -563,6 +635,7 @@ abstract class _Invoice implements Invoice {
     final Decimal? paidAmount,
     final String? notes,
     final bool isGstInvoice,
+    final bool showTaxOnBill,
     final String? placeOfSupply,
     required final DateTime createdAt,
     required final DateTime updatedAt,
@@ -577,6 +650,10 @@ abstract class _Invoice implements Invoice {
   String get invoiceNumber;
   @override
   int? get customerId;
+  @override
+  String? get customerName; // Store customer name directly in invoice
+  @override
+  String? get customerEmail; // Store customer email directly in invoice
   @override
   DateTime get invoiceDate;
   @override
@@ -601,6 +678,8 @@ abstract class _Invoice implements Invoice {
   String? get notes;
   @override
   bool get isGstInvoice;
+  @override
+  bool get showTaxOnBill; // New field to control tax display on PDF
   @override
   String? get placeOfSupply;
   @override

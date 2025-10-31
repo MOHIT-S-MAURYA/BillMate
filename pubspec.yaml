@@ -1,8 +1,8 @@
 name: billmate
 description: "BillMate - Custom Billing Software for Shops with GST Compliance"
-publish_to: 'none'
+publish_to: "none"
 
-version: 1.0.0+1
+version: 1.1.1+7
 
 environment:
   sdk: ^3.7.2
@@ -17,41 +17,52 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # UI and Icons
+  # For onboarding
+  introduction_screen: ^3.1.12
+  shared_preferences: ^2.3.3
+
+  # Icons
   cupertino_icons: ^1.0.8
-  
+
   # State Management
   flutter_bloc: ^8.1.6
   equatable: ^2.0.5
-  
+
   # Dependency Injection
   get_it: ^7.7.0
   injectable: ^2.4.4
-  
+
   # Database
   sqflite: ^2.3.3+1
   path: ^1.9.0
-  
+
   # Data Models and Serialization
   freezed_annotation: ^2.4.4
   json_annotation: ^4.9.0
   dartz: ^0.10.1
-  
+
   # PDF Generation
   pdf: ^3.11.1
   printing: ^5.13.2
-  
+
   # File System and Sharing
   path_provider: ^2.1.4
   share_plus: ^10.0.2
-  
+
   # Date and Time
   intl: ^0.19.0
-  
+
   # Utilities
   uuid: ^4.5.1
   logger: ^2.4.0
-  
+  shimmer: ^3.0.0
+
+  # Barcode/QR Code
+  mobile_scanner: ^5.2.3
+
+  # Charts
+  fl_chart: ^0.69.0
+
   # GST and Calculations
   decimal: ^3.0.2
 
@@ -61,13 +72,13 @@ dev_dependencies:
 
   # Linting
   flutter_lints: ^5.0.0
-  
+
   # Code Generation
   build_runner: ^2.4.13
   freezed: ^2.5.7
   json_serializable: ^6.8.0
   injectable_generator: ^2.6.2
-  
+
   # Testing
   mockito: ^5.4.4
   bloc_test: ^9.1.7
@@ -77,7 +88,6 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
-
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.

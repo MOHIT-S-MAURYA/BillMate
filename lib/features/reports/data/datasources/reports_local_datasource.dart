@@ -125,11 +125,11 @@ class ReportsLocalDataSource implements ReportsDataSource {
       '''
       SELECT 
         item_id,
-        old_quantity,
+        previous_quantity,
         new_quantity,
-        quantity_changed,
+        quantity_change,
         transaction_type,
-        reference_id,
+        invoice_id,
         notes,
         created_at
       FROM inventory_transactions 

@@ -72,10 +72,14 @@ class BillingLocalDataSourceImpl implements BillingLocalDataSource {
     final invoices = <InvoiceModel>[];
     for (final map in maps) {
       final invoice = InvoiceModel.fromJson(map);
-      final itemsMap = await db.query(
-        'invoice_items',
-        where: 'invoice_id = ?',
-        whereArgs: [invoice.id],
+      final itemsMap = await db.rawQuery(
+        '''
+        SELECT ii.*, it.name as item_name, it.description as item_description, it.unit
+        FROM invoice_items ii
+        LEFT JOIN items it ON ii.item_id = it.id
+        WHERE ii.invoice_id = ?
+      ''',
+        [invoice.id],
       );
       final items =
           itemsMap.map((item) => InvoiceItemModel.fromJson(item)).toList();
@@ -89,7 +93,9 @@ class BillingLocalDataSourceImpl implements BillingLocalDataSource {
     final db = await databaseHelper.database;
     final List<Map<String, dynamic>> maps = await db.rawQuery(
       '''
-      SELECT i.*, c.name as customer_name, c.email as customer_email,
+      SELECT i.*,
+             COALESCE(i.customer_name, c.name) as customer_name,
+             COALESCE(i.customer_email, c.email) as customer_email,
              c.phone as customer_phone, c.gstin as customer_gstin,
              c.state_code as customer_state_code
       FROM invoices i
@@ -102,10 +108,14 @@ class BillingLocalDataSourceImpl implements BillingLocalDataSource {
     if (maps.isEmpty) return null;
 
     final invoice = InvoiceModel.fromJson(maps.first);
-    final itemsMap = await db.query(
-      'invoice_items',
-      where: 'invoice_id = ?',
-      whereArgs: [id],
+    final itemsMap = await db.rawQuery(
+      '''
+      SELECT ii.*, it.name as item_name, it.description as item_description, it.unit
+      FROM invoice_items ii
+      LEFT JOIN items it ON ii.item_id = it.id
+      WHERE ii.invoice_id = ?
+    ''',
+      [id],
     );
     final items =
         itemsMap.map((item) => InvoiceItemModel.fromJson(item)).toList();
@@ -117,7 +127,9 @@ class BillingLocalDataSourceImpl implements BillingLocalDataSource {
     final db = await databaseHelper.database;
     final List<Map<String, dynamic>> maps = await db.rawQuery(
       '''
-      SELECT i.*, c.name as customer_name, c.email as customer_email,
+      SELECT i.*,
+             COALESCE(i.customer_name, c.name) as customer_name,
+             COALESCE(i.customer_email, c.email) as customer_email,
              c.phone as customer_phone, c.gstin as customer_gstin,
              c.state_code as customer_state_code
       FROM invoices i
@@ -130,10 +142,14 @@ class BillingLocalDataSourceImpl implements BillingLocalDataSource {
     if (maps.isEmpty) return null;
 
     final invoice = InvoiceModel.fromJson(maps.first);
-    final itemsMap = await db.query(
-      'invoice_items',
-      where: 'invoice_id = ?',
-      whereArgs: [invoice.id],
+    final itemsMap = await db.rawQuery(
+      '''
+      SELECT ii.*, it.name as item_name, it.description as item_description, it.unit
+      FROM invoice_items ii
+      LEFT JOIN items it ON ii.item_id = it.id
+      WHERE ii.invoice_id = ?
+    ''',
+      [invoice.id],
     );
     final items =
         itemsMap.map((item) => InvoiceItemModel.fromJson(item)).toList();
@@ -145,7 +161,9 @@ class BillingLocalDataSourceImpl implements BillingLocalDataSource {
     final db = await databaseHelper.database;
     final List<Map<String, dynamic>> maps = await db.rawQuery(
       '''
-      SELECT i.*, c.name as customer_name, c.email as customer_email,
+      SELECT i.*,
+             COALESCE(i.customer_name, c.name) as customer_name,
+             COALESCE(i.customer_email, c.email) as customer_email,
              c.phone as customer_phone, c.gstin as customer_gstin,
              c.state_code as customer_state_code
       FROM invoices i
@@ -159,10 +177,14 @@ class BillingLocalDataSourceImpl implements BillingLocalDataSource {
     final invoices = <InvoiceModel>[];
     for (final map in maps) {
       final invoice = InvoiceModel.fromJson(map);
-      final itemsMap = await db.query(
-        'invoice_items',
-        where: 'invoice_id = ?',
-        whereArgs: [invoice.id],
+      final itemsMap = await db.rawQuery(
+        '''
+        SELECT ii.*, it.name as item_name, it.description as item_description, it.unit
+        FROM invoice_items ii
+        LEFT JOIN items it ON ii.item_id = it.id
+        WHERE ii.invoice_id = ?
+      ''',
+        [invoice.id],
       );
       final items =
           itemsMap.map((item) => InvoiceItemModel.fromJson(item)).toList();
@@ -179,7 +201,9 @@ class BillingLocalDataSourceImpl implements BillingLocalDataSource {
     final db = await databaseHelper.database;
     final List<Map<String, dynamic>> maps = await db.rawQuery(
       '''
-      SELECT i.*, c.name as customer_name, c.email as customer_email,
+      SELECT i.*,
+             COALESCE(i.customer_name, c.name) as customer_name,
+             COALESCE(i.customer_email, c.email) as customer_email,
              c.phone as customer_phone, c.gstin as customer_gstin,
              c.state_code as customer_state_code
       FROM invoices i
@@ -193,10 +217,14 @@ class BillingLocalDataSourceImpl implements BillingLocalDataSource {
     final invoices = <InvoiceModel>[];
     for (final map in maps) {
       final invoice = InvoiceModel.fromJson(map);
-      final itemsMap = await db.query(
-        'invoice_items',
-        where: 'invoice_id = ?',
-        whereArgs: [invoice.id],
+      final itemsMap = await db.rawQuery(
+        '''
+        SELECT ii.*, it.name as item_name, it.description as item_description, it.unit
+        FROM invoice_items ii
+        LEFT JOIN items it ON ii.item_id = it.id
+        WHERE ii.invoice_id = ?
+      ''',
+        [invoice.id],
       );
       final items =
           itemsMap.map((item) => InvoiceItemModel.fromJson(item)).toList();
@@ -210,12 +238,14 @@ class BillingLocalDataSourceImpl implements BillingLocalDataSource {
     final db = await databaseHelper.database;
     final List<Map<String, dynamic>> maps = await db.rawQuery(
       '''
-      SELECT i.*, c.name as customer_name, c.email as customer_email,
+      SELECT i.*,
+             COALESCE(i.customer_name, c.name) as customer_name,
+             COALESCE(i.customer_email, c.email) as customer_email,
              c.phone as customer_phone, c.gstin as customer_gstin,
              c.state_code as customer_state_code
       FROM invoices i
       LEFT JOIN customers c ON i.customer_id = c.id
-      WHERE i.invoice_number LIKE ? OR c.name LIKE ? OR i.notes LIKE ?
+      WHERE i.invoice_number LIKE ? OR COALESCE(i.customer_name, c.name) LIKE ? OR i.notes LIKE ?
       ORDER BY i.created_at DESC
     ''',
       ['%$query%', '%$query%', '%$query%'],
@@ -224,10 +254,14 @@ class BillingLocalDataSourceImpl implements BillingLocalDataSource {
     final invoices = <InvoiceModel>[];
     for (final map in maps) {
       final invoice = InvoiceModel.fromJson(map);
-      final itemsMap = await db.query(
-        'invoice_items',
-        where: 'invoice_id = ?',
-        whereArgs: [invoice.id],
+      final itemsMap = await db.rawQuery(
+        '''
+        SELECT ii.*, it.name as item_name, it.description as item_description, it.unit
+        FROM invoice_items ii
+        LEFT JOIN items it ON ii.item_id = it.id
+        WHERE ii.invoice_id = ?
+      ''',
+        [invoice.id],
       );
       final items =
           itemsMap.map((item) => InvoiceItemModel.fromJson(item)).toList();

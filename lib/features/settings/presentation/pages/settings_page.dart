@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:billmate/core/di/injection_container.dart';
+import 'package:billmate/core/localization/country_service.dart';
 import 'package:billmate/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:billmate/features/settings/presentation/widgets/edit_business_dialog.dart';
 import 'package:billmate/shared/constants/app_colors.dart';
@@ -152,6 +153,8 @@ class SettingsView extends StatelessWidget {
           _buildWelcomeCard(config),
           const SizedBox(height: 24),
           _buildBusinessInfoSection(context, config),
+          const SizedBox(height: 24),
+          _buildCountrySettingsSection(context),
           const SizedBox(height: 24),
           _buildInvoiceSettingsSection(context),
           const SizedBox(height: 24),
@@ -462,6 +465,17 @@ class SettingsView extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+
+  Widget _buildCountrySettingsSection(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader('Country & Currency', Icons.language),
+        const SizedBox(height: 16),
+        _buildCountrySettingsCard(context),
+      ],
     );
   }
 
@@ -1045,6 +1059,143 @@ class SettingsView extends StatelessWidget {
                   ),
                 ),
                 child: const Text('Refresh'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  Widget _buildCountrySettingsCard(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.borderColor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ListenableBuilder(
+              listenable: getIt<CountryService>(),
+              builder: (context, _) {
+                final countryService = getIt<CountryService>();
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.public, color: AppColors.primary),
+                  title: const Text('Country'),
+                  subtitle: const Text('Select your business location'),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        countryService.selectedCountry,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Icon(Icons.chevron_right),
+                    ],
+                  ),
+                  onTap: () => _showCountrySelectionDialog(context),
+                );
+              },
+            ),
+            const Divider(height: 32, color: AppColors.dividerColor),
+            ListenableBuilder(
+              listenable: getIt<CountryService>(),
+              builder: (context, _) {
+                final countryService = getIt<CountryService>();
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(
+                    Icons.currency_exchange,
+                    color: AppColors.primary,
+                  ),
+                  title: const Text('Currency'),
+                  subtitle: const Text('Display currency throughout the app'),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '${countryService.selectedCurrency} (${countryService.currencyCode})',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Icon(Icons.chevron_right),
+                    ],
+                  ),
+                  onTap: () => _showCountrySelectionDialog(context),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showCountrySelectionDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder:
+          (dialogContext) => AlertDialog(
+            title: const Text('Select Country'),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: CountryService.supportedCountries.length,
+                itemBuilder: (context, index) {
+                  final country = CountryService.supportedCountries.keys
+                      .elementAt(index);
+                  final countryData =
+                      CountryService.supportedCountries[country]!;
+                  final isSelected =
+                      getIt<CountryService>().selectedCountry == country;
+
+                  return ListTile(
+                    leading: Text(
+                      countryData['currency_symbol']!,
+                      style: const TextStyle(fontSize: 20),
+                    ),
+                    title: Text(country),
+                    subtitle: Text(
+                      '${countryData['currency_code']} • ${countryData['tax_name']}',
+                    ),
+                    trailing:
+                        isSelected
+                            ? const Icon(Icons.check, color: AppColors.primary)
+                            : null,
+                    selected: isSelected,
+                    onTap: () async {
+                      await getIt<CountryService>().setCountry(country);
+                      if (dialogContext.mounted) {
+                        Navigator.of(dialogContext).pop();
+                      }
+                    },
+                  );
+                },
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('Close'),
               ),
             ],
           ),

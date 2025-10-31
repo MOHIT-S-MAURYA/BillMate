@@ -4,8 +4,10 @@ import 'package:billmate/shared/constants/app_colors.dart';
 import 'package:billmate/features/dashboard/presentation/bloc/dashboard_bloc.dart';
 import 'package:billmate/features/billing/services/payment_alert_service.dart';
 import 'package:billmate/core/di/injection_container.dart';
+import 'package:billmate/core/localization/country_service.dart';
 import 'package:billmate/features/reports/presentation/pages/reports_page.dart';
-import 'package:decimal/decimal.dart';
+import 'package:billmate/core/events/inventory_events.dart' as events;
+import 'dart:async';
 
 class DashboardPage extends StatelessWidget {
   final Function(int) onNavigate;
@@ -29,7 +31,7 @@ class DashboardPage extends StatelessWidget {
   }
 }
 
-class DashboardView extends StatelessWidget {
+class DashboardView extends StatefulWidget {
   final Function(int) onNavigate;
   final Function(int, String?)? onNavigateWithFilter;
 
@@ -38,6 +40,38 @@ class DashboardView extends StatelessWidget {
     required this.onNavigate,
     this.onNavigateWithFilter,
   });
+
+  @override
+  State<DashboardView> createState() => _DashboardViewState();
+}
+
+class _DashboardViewState extends State<DashboardView> {
+  StreamSubscription<events.InventoryEvent>? _inventoryEventSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    // Listen to inventory events for auto-refresh
+    _inventoryEventSubscription = events.InventoryEventBus().events.listen((
+      event,
+    ) {
+      if (event.type == events.InventoryEventType.stockChanged ||
+          event.type == events.InventoryEventType.itemCreated ||
+          event.type == events.InventoryEventType.itemUpdated ||
+          event.type == events.InventoryEventType.itemDeleted) {
+        // Auto-refresh dashboard when inventory changes
+        if (mounted) {
+          context.read<DashboardBloc>().add(RefreshDashboardStats());
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _inventoryEventSubscription?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -244,13 +278,13 @@ class DashboardView extends StatelessWidget {
               ),
               TextButton(
                 onPressed: () {
-                  if (onNavigateWithFilter != null) {
-                    onNavigateWithFilter!(
+                  if (widget.onNavigateWithFilter != null) {
+                    widget.onNavigateWithFilter!(
                       3,
                       'Overdue',
                     ); // Navigate to invoices with overdue filter
                   } else {
-                    onNavigate(3); // Fallback to regular navigation
+                    widget.onNavigate(3); // Fallback to regular navigation
                   }
                 },
                 style: TextButton.styleFrom(
@@ -278,9 +312,18 @@ class DashboardView extends StatelessWidget {
         Expanded(
           child: _buildStatCard(
             title: 'Today\'s Sales',
-            value: '₹${_formatCurrency(state.todaysSales)}',
+            value: getIt<CountryService>().formatCurrencyCompact(
+              state.todaysSales.toDouble(),
+            ),
             icon: Icons.trending_up,
             color: AppColors.success,
+            onTap: () {
+              // Navigate to sales report
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ReportsPage()),
+              );
+            },
           ),
         ),
         const SizedBox(width: 12),
@@ -290,6 +333,10 @@ class DashboardView extends StatelessWidget {
             value: '${state.totalItems}',
             icon: Icons.inventory_2,
             color: AppColors.info,
+            onTap: () {
+              // Navigate to inventory page
+              widget.onNavigate(2);
+            },
           ),
         ),
         const SizedBox(width: 12),
@@ -300,6 +347,10 @@ class DashboardView extends StatelessWidget {
             icon: Icons.warning,
             color:
                 state.lowStockItems > 0 ? AppColors.warning : AppColors.success,
+            onTap: () {
+              // Navigate to inventory page (low stock tab)
+              widget.onNavigate(2);
+            },
           ),
         ),
       ],
@@ -311,49 +362,54 @@ class DashboardView extends StatelessWidget {
     required String value,
     required IconData icon,
     required Color color,
+    VoidCallback? onTap,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: color, size: 20),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w500,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: color, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: color,
+              ],
             ),
-          ),
-        ],
+            const SizedBox(height: 8),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -378,7 +434,7 @@ class DashboardView extends StatelessWidget {
                 title: 'New Invoice',
                 icon: Icons.receipt_long,
                 color: AppColors.primary,
-                onTap: () => onNavigate(3), // Navigate to invoices tab
+                onTap: () => widget.onNavigate(3), // Navigate to invoices tab
               ),
             ),
             const SizedBox(width: 12),
@@ -387,7 +443,7 @@ class DashboardView extends StatelessWidget {
                 title: 'Add Item',
                 icon: Icons.add_box,
                 color: AppColors.success,
-                onTap: () => onNavigate(1), // Navigate to inventory tab
+                onTap: () => widget.onNavigate(1), // Navigate to inventory tab
               ),
             ),
           ],
@@ -400,7 +456,7 @@ class DashboardView extends StatelessWidget {
                 title: 'Add Customer',
                 icon: Icons.person_add,
                 color: AppColors.info,
-                onTap: () => onNavigate(2), // Navigate to customers tab
+                onTap: () => widget.onNavigate(2), // Navigate to customers tab
               ),
             ),
             const SizedBox(width: 12),
@@ -606,23 +662,6 @@ class DashboardView extends StatelessWidget {
       return '${difference.inMinutes} minute${difference.inMinutes == 1 ? '' : 's'} ago';
     } else {
       return 'Just now';
-    }
-  }
-
-  String _formatCurrency(Decimal value) {
-    final doubleValue = value.toDouble();
-    final intValue = doubleValue.toInt();
-    if (intValue >= 10000000) {
-      // 1 crore
-      return '${(doubleValue / 10000000).toStringAsFixed(1)}Cr';
-    } else if (intValue >= 100000) {
-      // 1 lakh
-      return '${(doubleValue / 100000).toStringAsFixed(1)}L';
-    } else if (intValue >= 1000) {
-      // 1 thousand
-      return '${(doubleValue / 1000).toStringAsFixed(1)}K';
-    } else {
-      return intValue.toString();
     }
   }
 }

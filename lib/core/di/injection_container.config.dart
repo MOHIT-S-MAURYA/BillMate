@@ -43,6 +43,18 @@ import 'package:billmate/features/inventory/domain/usecases/inventory_usecases.d
     as _i576;
 import 'package:billmate/features/inventory/presentation/bloc/inventory_bloc.dart'
     as _i781;
+import 'package:billmate/features/reports/data/datasources/reports_datasource.dart'
+    as _i812;
+import 'package:billmate/features/reports/data/datasources/reports_local_datasource.dart'
+    as _i1069;
+import 'package:billmate/features/reports/data/repositories/reports_repository_impl.dart'
+    as _i119;
+import 'package:billmate/features/reports/domain/repositories/reports_repository.dart'
+    as _i390;
+import 'package:billmate/features/reports/domain/usecases/reports_usecases.dart'
+    as _i378;
+import 'package:billmate/features/reports/presentation/bloc/reports_bloc.dart'
+    as _i535;
 import 'package:billmate/features/settings/data/datasources/settings_local_datasource.dart'
     as _i379;
 import 'package:billmate/features/settings/data/repositories/settings_repository_impl.dart'
@@ -64,7 +76,12 @@ extension GetItInjectableX on _i174.GetIt {
   }) {
     final gh = _i526.GetItHelper(this, environment, environmentFilter);
     final registerModule = _$RegisterModule();
+    gh.factory<_i812.ReportsDataSource>(() => registerModule.reportsDataSource);
+    gh.factory<_i390.ReportsRepository>(() => registerModule.reportsRepository);
     gh.singleton<_i14.DatabaseHelper>(() => registerModule.databaseHelper);
+    gh.factory<_i1069.ReportsLocalDataSource>(
+      () => _i1069.ReportsLocalDataSource(gh<_i14.DatabaseHelper>()),
+    );
     gh.factory<_i635.BillingLocalDataSource>(
       () => _i635.BillingLocalDataSourceImpl(gh<_i14.DatabaseHelper>()),
     );
@@ -77,6 +94,24 @@ extension GetItInjectableX on _i174.GetIt {
     gh.factory<_i411.InventoryRepository>(
       () =>
           _i1065.InventoryRepositoryImpl(gh<_i132.InventoryLocalDataSource>()),
+    );
+    gh.factory<_i378.GenerateSalesReportUseCase>(
+      () => _i378.GenerateSalesReportUseCase(gh<_i390.ReportsRepository>()),
+    );
+    gh.factory<_i378.GenerateInventoryReportUseCase>(
+      () => _i378.GenerateInventoryReportUseCase(gh<_i390.ReportsRepository>()),
+    );
+    gh.factory<_i378.GeneratePaymentReportUseCase>(
+      () => _i378.GeneratePaymentReportUseCase(gh<_i390.ReportsRepository>()),
+    );
+    gh.factory<_i378.GenerateBusinessReportUseCase>(
+      () => _i378.GenerateBusinessReportUseCase(gh<_i390.ReportsRepository>()),
+    );
+    gh.factory<_i378.GetAvailableReportTypesUseCase>(
+      () => _i378.GetAvailableReportTypesUseCase(gh<_i390.ReportsRepository>()),
+    );
+    gh.factory<_i378.ExportReportUseCase>(
+      () => _i378.ExportReportUseCase(gh<_i390.ReportsRepository>()),
     );
     gh.factory<_i677.BillingRepository>(
       () => _i290.BillingRepositoryImpl(gh<_i635.BillingLocalDataSource>()),
@@ -150,8 +185,20 @@ extension GetItInjectableX on _i174.GetIt {
     gh.factory<_i748.SettingsRepository>(
       () => _i208.SettingsRepositoryImpl(gh<_i379.SettingsLocalDataSource>()),
     );
+    gh.factory<_i119.ReportsRepositoryImpl>(
+      () => _i119.ReportsRepositoryImpl(gh<_i812.ReportsDataSource>()),
+    );
     gh.factory<_i707.PaymentAlertService>(
       () => _i707.PaymentAlertService(gh<_i677.BillingRepository>()),
+    );
+    gh.factory<_i535.ReportsBloc>(
+      () => _i535.ReportsBloc(
+        gh<_i378.GenerateSalesReportUseCase>(),
+        gh<_i378.GenerateInventoryReportUseCase>(),
+        gh<_i378.GeneratePaymentReportUseCase>(),
+        gh<_i378.GenerateBusinessReportUseCase>(),
+        gh<_i378.ExportReportUseCase>(),
+      ),
     );
     gh.factory<_i719.GetBillingDashboardStatsUseCase>(
       () =>

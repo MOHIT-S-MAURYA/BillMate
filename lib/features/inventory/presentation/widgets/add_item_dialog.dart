@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:decimal/decimal.dart';
 import 'package:billmate/features/inventory/domain/entities/item.dart';
 import 'package:billmate/features/inventory/presentation/bloc/inventory_bloc.dart';
+import 'package:billmate/features/inventory/presentation/widgets/edit_item_dialog.dart';
 import 'package:billmate/shared/constants/app_colors.dart';
 
 class AddItemDialog extends StatefulWidget {
@@ -28,6 +29,8 @@ class _AddItemDialogState extends State<AddItemDialog> {
 
   int? _selectedCategoryId;
   List<Category> _categories = [];
+  List<Item> _allItems = [];
+  List<Item> _similarItems = [];
   bool _isLoading = false;
 
   @override
@@ -35,6 +38,7 @@ class _AddItemDialogState extends State<AddItemDialog> {
     super.initState();
     _loadCategories();
     _initializeFields();
+    _nameController.addListener(_checkForSimilarItems);
   }
 
   void _loadCategories() {
@@ -65,6 +69,7 @@ class _AddItemDialogState extends State<AddItemDialog> {
 
   @override
   void dispose() {
+    _nameController.removeListener(_checkForSimilarItems);
     _nameController.dispose();
     _descriptionController.dispose();
     _hsnCodeController.dispose();
@@ -77,6 +82,94 @@ class _AddItemDialogState extends State<AddItemDialog> {
     super.dispose();
   }
 
+  void _checkForSimilarItems() {
+    // Only check for new items, not when editing existing items
+    if (widget.item != null) return;
+
+    final query = _nameController.text.trim().toLowerCase();
+    if (query.isEmpty || query.length < 2) {
+      setState(() {
+        _similarItems = [];
+      });
+      return;
+    }
+
+    // Find similar items by checking if the query is contained in the item name
+    final similar =
+        _allItems
+            .where((item) {
+              final itemName = item.name.toLowerCase();
+              // Check for exact match or similar names
+              return itemName.contains(query) ||
+                  query.contains(itemName) ||
+                  _calculateSimilarity(itemName, query) > 0.6;
+            })
+            .take(5)
+            .toList();
+
+    setState(() {
+      _similarItems = similar;
+    });
+  }
+
+  // Calculate similarity between two strings (simple algorithm)
+  double _calculateSimilarity(String s1, String s2) {
+    if (s1 == s2) return 1.0;
+    if (s1.isEmpty || s2.isEmpty) return 0.0;
+
+    final longer = s1.length > s2.length ? s1 : s2;
+    final shorter = s1.length > s2.length ? s2 : s1;
+
+    if (longer.isEmpty) return 1.0;
+
+    return (longer.length - _editDistance(longer, shorter)) / longer.length;
+  }
+
+  // Calculate edit distance between two strings
+  int _editDistance(String s1, String s2) {
+    final costs = List<int>.filled(s2.length + 1, 0);
+
+    for (int i = 0; i <= s1.length; i++) {
+      int lastValue = i;
+      for (int j = 0; j <= s2.length; j++) {
+        if (i == 0) {
+          costs[j] = j;
+        } else {
+          if (j > 0) {
+            int newValue = costs[j - 1];
+            if (s1[i - 1] != s2[j - 1]) {
+              newValue =
+                  [
+                    newValue,
+                    lastValue,
+                    costs[j],
+                  ].reduce((a, b) => a < b ? a : b) +
+                  1;
+            }
+            costs[j - 1] = lastValue;
+            lastValue = newValue;
+          }
+        }
+      }
+      if (i > 0) costs[s2.length] = lastValue;
+    }
+
+    return costs[s2.length];
+  }
+
+  void _navigateToEditItem(Item item) {
+    Navigator.of(context).pop(); // Close add dialog
+    // Open edit dialog with the selected item
+    showDialog(
+      context: context,
+      builder:
+          (dialogContext) => BlocProvider.value(
+            value: context.read<InventoryBloc>(),
+            child: EditItemDialog(item: item),
+          ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocListener<InventoryBloc, InventoryState>(
@@ -84,6 +177,7 @@ class _AddItemDialogState extends State<AddItemDialog> {
         if (state is ItemsLoaded) {
           setState(() {
             _categories = state.categories;
+            _allItems = state.items;
           });
         } else if (state is InventorySuccess) {
           Navigator.of(context).pop();
@@ -196,6 +290,92 @@ class _AddItemDialogState extends State<AddItemDialog> {
           required: true,
           icon: Icons.inventory_2,
         ),
+        // Show similar items warning if any found
+        if (_similarItems.isNotEmpty && widget.item == null) ...[
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.warning.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: AppColors.warning.withValues(alpha: 0.3),
+                width: 1,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      color: AppColors.warning,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Similar products found!',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'These products already exist. Click to edit instead of creating duplicate:',
+                  style: TextStyle(fontSize: 12),
+                ),
+                const SizedBox(height: 8),
+                ..._similarItems.map(
+                  (item) => InkWell(
+                    onTap: () => _navigateToEditItem(item),
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: AppColors.primary.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item.name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Price: ₹${item.sellingPrice} | Stock: ${item.stockQuantity} ${item.unit}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(Icons.edit, color: AppColors.primary, size: 20),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 16),
         _buildTextField(
           controller: _descriptionController,

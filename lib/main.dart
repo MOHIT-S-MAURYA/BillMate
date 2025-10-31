@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:billmate/core/di/injection_container.dart';
 import 'package:billmate/core/database/database_helper.dart';
+import 'package:billmate/core/localization/country_service.dart';
 import 'package:billmate/core/navigation/navigation_service.dart';
 import 'package:billmate/core/navigation/app_routes.dart';
-import 'package:billmate/shared/constants/app_colors.dart';
 import 'package:billmate/shared/constants/app_strings.dart';
+import 'package:billmate/shared/constants/app_theme.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -13,14 +14,24 @@ void main() async {
   // Initialize dependencies
   await configureDependencies();
 
-  // Initialize database
-  await DatabaseHelper().database;
+  // Initialize services
+  await getIt<DatabaseHelper>().database;
+  await getIt<CountryService>().initialize();
 
-  runApp(const BillMateApp());
+  // Check if onboarding has been seen
+  final prefs = await SharedPreferences.getInstance();
+  final hasSeenOnboarding = prefs.getBool('hasSeenOnboarding') ?? false;
+
+  // Reset database in debug mode for easy testing
+  // await DatabaseResetService(getIt<DatabaseHelper>()).resetDatabase();
+  // await DemoDataService(getIt<DatabaseHelper>()).init();
+
+  runApp(BillMateApp(hasSeenOnboarding: hasSeenOnboarding));
 }
 
 class BillMateApp extends StatelessWidget {
-  const BillMateApp({super.key});
+  final bool hasSeenOnboarding;
+  const BillMateApp({super.key, required this.hasSeenOnboarding});
 
   @override
   Widget build(BuildContext context) {
@@ -30,41 +41,11 @@ class BillMateApp extends StatelessWidget {
       navigatorKey: NavigationService.instance.navigatorKey,
       onGenerateRoute: AppRouteGenerator.generateRoute,
       initialRoute: AppRoutes.main,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: AppColors.primary,
-          brightness: Brightness.light,
-        ),
-        useMaterial3: true,
-        appBarTheme: const AppBarTheme(
-          centerTitle: true,
-          elevation: 0,
-          systemOverlayStyle: SystemUiOverlayStyle.dark,
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            elevation: 2,
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          ),
-        ),
-        // Enable gesture navigation
-        pageTransitionsTheme: const PageTransitionsTheme(
-          builders: {
-            TargetPlatform.android: CupertinoPageTransitionsBuilder(),
-            TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-          },
-        ),
-      ),
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode:
+          ThemeMode.system, // Automatically switches based on system settings
       builder: (context, child) {
-        // Set system UI overlay style
-        SystemChrome.setSystemUIOverlayStyle(
-          const SystemUiOverlayStyle(
-            statusBarColor: Colors.transparent,
-            statusBarIconBrightness: Brightness.dark,
-            systemNavigationBarColor: Colors.white,
-            systemNavigationBarIconBrightness: Brightness.dark,
-          ),
-        );
         return child ?? const SizedBox.shrink();
       },
     );

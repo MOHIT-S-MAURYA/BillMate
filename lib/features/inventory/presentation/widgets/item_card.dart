@@ -142,10 +142,10 @@ class _ItemCardState extends State<ItemCard>
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        _buildCategoryChip(),
+                        Expanded(child: _buildCategoryChip()),
                         if (widget.item.hsnCode?.isNotEmpty == true) ...[
                           const SizedBox(width: 8),
-                          _buildHsnChip(),
+                          Expanded(child: _buildHsnChip()),
                         ],
                       ],
                     ),
@@ -237,12 +237,15 @@ class _ItemCardState extends State<ItemCard>
         children: [
           Icon(Icons.category, size: 14, color: AppColors.primary),
           const SizedBox(width: 4),
-          Text(
-            widget.category.name,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: AppColors.primary,
+          Flexible(
+            child: Text(
+              widget.category.name,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.primary,
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],

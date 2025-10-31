@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:billmate/core/di/injection_container.dart';
+import 'package:billmate/core/localization/country_service.dart';
 import 'package:billmate/features/reports/presentation/bloc/reports_bloc.dart';
 import 'package:billmate/features/reports/domain/entities/report.dart';
 import 'package:billmate/features/reports/presentation/widgets/date_range_picker.dart';
@@ -152,7 +154,9 @@ class _PaymentSummaryCards extends StatelessWidget {
             Expanded(
               child: _SummaryCard(
                 title: 'Total Collected',
-                value: '\$${report.totalCollected.toStringAsFixed(2)}',
+                value: getIt<CountryService>().formatCurrency(
+                  report.totalCollected.toDouble(),
+                ),
                 icon: Icons.check_circle,
                 color: Colors.green,
               ),
@@ -161,7 +165,9 @@ class _PaymentSummaryCards extends StatelessWidget {
             Expanded(
               child: _SummaryCard(
                 title: 'Total Pending',
-                value: '\$${report.totalPending.toStringAsFixed(2)}',
+                value: getIt<CountryService>().formatCurrency(
+                  report.totalPending.toDouble(),
+                ),
                 icon: Icons.pending,
                 color: Colors.orange,
               ),
@@ -174,7 +180,9 @@ class _PaymentSummaryCards extends StatelessWidget {
             Expanded(
               child: _SummaryCard(
                 title: 'Overdue Amount',
-                value: '\$${report.totalOverdue.toStringAsFixed(2)}',
+                value: getIt<CountryService>().formatCurrency(
+                  report.totalOverdue.toDouble(),
+                ),
                 icon: Icons.warning,
                 color: Colors.red,
               ),
@@ -292,7 +300,9 @@ class _PaymentStatusChart extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        '\$${status.amount.toStringAsFixed(2)}',
+                        getIt<CountryService>().formatCurrency(
+                          status.amount.toDouble(),
+                        ),
                         style: Theme.of(context).textTheme.titleMedium
                             ?.copyWith(fontWeight: FontWeight.bold),
                       ),
@@ -422,7 +432,9 @@ class _OverdueInvoices extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          '\$${invoice.amount.toStringAsFixed(2)}',
+                          getIt<CountryService>().formatCurrency(
+                            invoice.amount.toDouble(),
+                          ),
                           style: Theme.of(
                             context,
                           ).textTheme.titleMedium?.copyWith(

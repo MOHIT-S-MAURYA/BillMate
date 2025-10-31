@@ -10,6 +10,8 @@ class Invoice with _$Invoice {
     int? id,
     required String invoiceNumber,
     int? customerId,
+    String? customerName, // Store customer name directly in invoice
+    String? customerEmail, // Store customer email directly in invoice
     required DateTime invoiceDate,
     DateTime? dueDate,
     required Decimal subtotal,
@@ -22,6 +24,8 @@ class Invoice with _$Invoice {
     Decimal? paidAmount, // New field for partial payments
     String? notes,
     @Default(true) bool isGstInvoice,
+    @Default(true)
+    bool showTaxOnBill, // New field to control tax display on PDF
     String? placeOfSupply,
     required DateTime createdAt,
     required DateTime updatedAt,

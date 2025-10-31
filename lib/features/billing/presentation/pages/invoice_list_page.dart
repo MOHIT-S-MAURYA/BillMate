@@ -8,6 +8,8 @@ import 'package:billmate/core/di/injection_container.dart';
 import 'package:billmate/features/billing/presentation/pages/create_invoice_page.dart';
 import 'package:billmate/features/billing/presentation/pages/invoice_detail_page.dart';
 import 'package:billmate/core/widgets/smart_deletion_widgets.dart';
+import 'package:billmate/shared/widgets/empty_state/empty_state_widget.dart';
+import 'package:billmate/shared/widgets/loading/loading_widget.dart';
 
 class InvoiceListPage extends StatelessWidget {
   final String? initialFilter;
@@ -226,49 +228,16 @@ class _InvoiceListViewState extends State<InvoiceListView> {
             child: BlocBuilder<BillingBloc, BillingState>(
               builder: (context, state) {
                 if (state is BillingLoading) {
-                  return const Center(
-                    child: CircularProgressIndicator(color: AppColors.primary),
-                  );
+                  return const Center(child: LoadingListTile());
                 }
 
                 if (state is BillingError) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.error_outline,
-                          size: 64,
-                          color: AppColors.error,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Error loading invoices',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          state.message,
-                          style: TextStyle(color: AppColors.textHint),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: () {
-                            context.read<BillingBloc>().add(LoadAllInvoices());
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                          ),
-                          child: const Text('Retry'),
-                        ),
-                      ],
-                    ),
+                  return EmptyStateWidget(
+                    message: state.message,
+                    icon: Icons.error_outline,
+                    onRetry: () {
+                      context.read<BillingBloc>().add(LoadAllInvoices());
+                    },
                   );
                 }
 
@@ -279,35 +248,12 @@ class _InvoiceListViewState extends State<InvoiceListView> {
                   final filteredInvoices = _getFilteredInvoices(allInvoices);
 
                   if (filteredInvoices.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.receipt_long_outlined,
-                            size: 64,
-                            color: AppColors.textHint,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            _selectedFilter == 'All'
-                                ? 'No invoices found'
-                                : 'No $_selectedFilter invoices found',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _selectedFilter == 'All'
-                                ? 'Create your first invoice to get started'
-                                : 'Try changing the filter or create a new invoice',
-                            style: TextStyle(color: AppColors.textHint),
-                          ),
-                        ],
-                      ),
+                    return EmptyStateWidget(
+                      message:
+                          _selectedFilter == 'All'
+                              ? 'No invoices found. Create your first invoice to get started!'
+                              : 'No $_selectedFilter invoices found',
+                      icon: Icons.receipt_long_outlined,
                     );
                   }
 

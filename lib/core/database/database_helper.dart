@@ -15,13 +15,21 @@ class DatabaseHelper {
     return _database!;
   }
 
+  /// Close and reset database connection for testing/development
+  Future<void> resetConnection() async {
+    if (_database != null) {
+      await _database!.close();
+      _database = null;
+    }
+  }
+
   Future<Database> _initDatabase() async {
     final documentsDirectory = await getApplicationDocumentsDirectory();
     final path = join(documentsDirectory.path, 'billmate.db');
 
     return await openDatabase(
       path,
-      version: 5,
+      version: 7,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -83,6 +91,33 @@ class DatabaseHelper {
         )
       ''');
     }
+    if (oldVersion < 6) {
+      // Add tax_rate column to invoices table
+      await db.execute('''
+        ALTER TABLE invoices ADD COLUMN tax_rate REAL DEFAULT 18.0
+      ''');
+    }
+    if (oldVersion < 7) {
+      // Add customer_name and customer_email columns to invoices table
+      await db.execute('''
+        ALTER TABLE invoices ADD COLUMN customer_name TEXT
+      ''');
+      await db.execute('''
+        ALTER TABLE invoices ADD COLUMN customer_email TEXT
+      ''');
+
+      // Populate existing invoices with customer data from customers table
+      await db.execute('''
+        UPDATE invoices
+        SET customer_name = (
+          SELECT name FROM customers WHERE customers.id = invoices.customer_id
+        ),
+        customer_email = (
+          SELECT email FROM customers WHERE customers.id = invoices.customer_id
+        )
+        WHERE customer_id IS NOT NULL
+      ''');
+    }
   }
 
   Future<void> _createTables(Database db) async {
@@ -141,9 +176,12 @@ class DatabaseHelper {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         invoice_number TEXT NOT NULL UNIQUE,
         customer_id INTEGER,
+        customer_name TEXT,
+        customer_email TEXT,
         invoice_date TEXT NOT NULL,
         due_date TEXT,
         subtotal REAL NOT NULL,
+        tax_rate REAL DEFAULT 18.0,
         tax_amount REAL NOT NULL,
         discount_amount REAL DEFAULT 0,
         total_amount REAL NOT NULL,
@@ -168,10 +206,11 @@ class DatabaseHelper {
         item_id INTEGER NOT NULL,
         quantity REAL NOT NULL,
         unit_price REAL NOT NULL,
+        total_price REAL NOT NULL,
         discount_percent REAL DEFAULT 0,
-        tax_rate REAL NOT NULL,
+        tax_rate REAL NOT NULL DEFAULT 18.0,
         line_total REAL NOT NULL,
-        created_at TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
         FOREIGN KEY (invoice_id) REFERENCES invoices (id) ON DELETE CASCADE,
         FOREIGN KEY (item_id) REFERENCES items (id)
       )

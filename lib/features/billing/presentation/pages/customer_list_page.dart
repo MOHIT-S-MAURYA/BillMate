@@ -7,6 +7,8 @@ import 'package:billmate/core/di/injection_container.dart';
 import 'package:billmate/features/billing/presentation/widgets/add_customer_dialog.dart';
 import 'package:billmate/core/navigation/modern_navigation_widgets.dart';
 import 'package:billmate/core/widgets/smart_deletion_widgets.dart';
+import 'package:billmate/shared/widgets/empty_state/empty_state_widget.dart';
+import 'package:billmate/shared/widgets/loading/loading_widget.dart';
 
 class CustomerListPage extends StatelessWidget {
   const CustomerListPage({super.key});
@@ -181,49 +183,16 @@ class _CustomerListViewState extends State<CustomerListView> {
             child: BlocBuilder<BillingBloc, BillingState>(
               builder: (context, state) {
                 if (state is BillingLoading) {
-                  return const Center(
-                    child: CircularProgressIndicator(color: AppColors.primary),
-                  );
+                  return const Center(child: LoadingListTile());
                 }
 
                 if (state is BillingError) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.error_outline,
-                          size: 64,
-                          color: AppColors.error,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Error loading customers',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          state.message,
-                          style: TextStyle(color: AppColors.textHint),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: () {
-                            context.read<BillingBloc>().add(LoadAllCustomers());
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                          ),
-                          child: const Text('Retry'),
-                        ),
-                      ],
-                    ),
+                  return EmptyStateWidget(
+                    message: state.message,
+                    icon: Icons.error_outline,
+                    onRetry: () {
+                      context.read<BillingBloc>().add(LoadAllCustomers());
+                    },
                   );
                 }
 
@@ -231,31 +200,10 @@ class _CustomerListViewState extends State<CustomerListView> {
                   final customers = state.customers;
 
                   if (customers.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.people_outline,
-                            size: 64,
-                            color: AppColors.textHint,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'No customers found',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Add your first customer to get started',
-                            style: TextStyle(color: AppColors.textHint),
-                          ),
-                        ],
-                      ),
+                    return const EmptyStateWidget(
+                      message:
+                          'No customers found. Add your first customer to get started!',
+                      icon: Icons.people_outline,
                     );
                   }
 
