@@ -43,8 +43,7 @@ class BillMateApp extends StatelessWidget {
       initialRoute: AppRoutes.main,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
-      themeMode:
-          ThemeMode.system, // Automatically switches based on system settings
+      themeMode: ThemeMode.system,
       builder: (context, child) {
         return child ?? const SizedBox.shrink();
       },
